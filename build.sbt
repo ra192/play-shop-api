@@ -1,4 +1,4 @@
-name := """play-java"""
+name := """play-shop-api"""
 
 version := "1.0-SNAPSHOT"
 

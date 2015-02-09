@@ -2,6 +2,7 @@ package actors;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import akka.actor.Status;
 import akka.actor.UntypedActor;
 import akka.dispatch.Futures;
 import akka.dispatch.OnSuccess;
@@ -65,7 +66,7 @@ public class GetCategoriesByParentActor extends UntypedActor {
                 }, system.dispatcher());
             };
             final Consumer<Throwable> errorConsumer = error -> {
-                log.error("Couldn't retrieve categories from db", error);
+                sender.tell(new Status.Failure(error), self);
 
             };
 
