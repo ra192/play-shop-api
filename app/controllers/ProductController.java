@@ -27,10 +27,10 @@ public class ProductController extends Controller {
 
         final ActorRef actorRef = Akka.system().actorOf(Props.create(GetProductsByCategoryAndFilter.class));
 
-        final ArrayList<String> objects = new ArrayList<>();
-        bodyAsJson.get("propertyValues").forEach(itm->objects.add(itm.asText()));
+        final ArrayList<String> propertyValues = new ArrayList<>();
+        bodyAsJson.get("propertyValues").forEach(itm->propertyValues.add(itm.asText()));
 
-        return Promise.wrap(Patterns.ask(actorRef,new GetProductsByCategoryAndFilter.Message(categoryName,new ArrayList<>()),5000)).map(res-> {
+        return Promise.wrap(Patterns.ask(actorRef,new GetProductsByCategoryAndFilter.Message(categoryName,propertyValues),5000)).map(res-> {
             List<ProductDto>products=(List<ProductDto>)res;
             return ok(Json.toJson(new ListResponseDto<>(products)));
         });
