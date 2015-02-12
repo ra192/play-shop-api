@@ -31,7 +31,6 @@ public class ProductController extends Controller {
         final ArrayList<String> propertyValues = new ArrayList<>();
         bodyAsJson.get("propertyValues").forEach(itm -> propertyValues.add(itm.asText()));
 
-
         final Integer first = (bodyAsJson.get("first") != null) ? bodyAsJson.get("first").asInt() : 0;
         final Integer max = (bodyAsJson.get("max") != null) ? bodyAsJson.get("max").asInt() : 100;
         final String orderProperty = (bodyAsJson.get("orderProperty") != null) ? bodyAsJson.get("max").asText() : "displayName";
