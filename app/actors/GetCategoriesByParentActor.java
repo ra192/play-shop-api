@@ -1,13 +1,11 @@
 package actors;
 
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
-import akka.actor.Status;
-import akka.actor.UntypedActor;
+import akka.actor.*;
 import akka.dispatch.Futures;
 import akka.dispatch.OnSuccess;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.japi.pf.ReceiveBuilder;
 import akka.pattern.Patterns;
 import com.github.pgasync.ResultSet;
 import db.MyConnectionPool;
@@ -22,17 +20,17 @@ import java.util.function.Consumer;
 /**
  * Created by yakov_000 on 29.01.2015.
  */
-public class GetCategoriesByParentActor extends UntypedActor {
+public class GetCategoriesByParentActor extends AbstractActor {
 
     final LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
-    public void onReceive(Object message) throws Exception {
-        if (message instanceof Long) {
-            Long parentId = (Long) message;
+    public GetCategoriesByParentActor() {
+
+        receive(ReceiveBuilder.match(Long.class,parentId->{
             log.info("Recieved: ".concat(parentId.toString()));
 
-            final ActorRef sender = getSender();
-            final ActorRef self = getSelf();
+            final ActorRef sender =sender();
+            final ActorRef self = self();
             final ActorSystem system = getContext().system();
 
             final Consumer<ResultSet> resultConsumer = result -> {
@@ -78,8 +76,6 @@ public class GetCategoriesByParentActor extends UntypedActor {
                 MyConnectionPool.db.query("select * from category where parent_id = $1", Arrays.asList(parentId),
                         resultConsumer,
                         errorConsumer);
-        } else {
-            unhandled(message);
-        }
+        }).build());
     }
 }

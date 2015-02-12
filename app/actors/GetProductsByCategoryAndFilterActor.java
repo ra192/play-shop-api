@@ -2,7 +2,9 @@ package actors;
 
 import akka.actor.*;
 import akka.dispatch.Futures;
+import akka.dispatch.OnComplete;
 import akka.dispatch.OnSuccess;
+import akka.japi.pf.ReceiveBuilder;
 import akka.pattern.Patterns;
 import db.MyConnectionPool;
 import dto.CategoryDto;
@@ -11,65 +13,64 @@ import dto.PropertyValueDto;
 import scala.concurrent.Future;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by yakov_000 on 09.02.2015.
  */
-public class GetProductsByCategoryAndFilter extends UntypedActor {
+public class GetProductsByCategoryAndFilterActor extends AbstractActor {
 
     private final ActorRef categoryByNameActorRef;
     private final ActorRef propertyValueByNameActorRef;
 
-    public GetProductsByCategoryAndFilter() {
+    public GetProductsByCategoryAndFilterActor() {
 
         categoryByNameActorRef = getContext().actorOf(Props.create(GetCategoryByNameActor.class));
-        propertyValueByNameActorRef=getContext().actorOf(Props.create(GetPropertyValueByNameActor.class));
-    }
+        propertyValueByNameActorRef = getContext().actorOf(Props.create(GetPropertyValueByNameActor.class));
 
-    @Override
-    public void onReceive(Object message) throws Exception {
-
-        if(message instanceof Message) {
-            Message inputParams= (Message) message;
-
-            final ActorRef self = getSelf();
-            final ActorRef sender = getSender();
-            final UntypedActorContext context = getContext();
+        receive(ReceiveBuilder.match(Message.class,inputParams->{
+            final ActorRef self = self();
+            final ActorRef sender = sender();
+            final ActorContext context = context();
 
             final Future<Object> categoryByNameFuture = Patterns.ask(categoryByNameActorRef, inputParams.getCategoryName(), 5000);
 
-            final List<Future<Object>>propertyValueFutures=new ArrayList<>();
-            for(String propertyValueName: inputParams.getPropertyValueNames()) {
-                propertyValueFutures.add(Patterns.ask(propertyValueByNameActorRef,propertyValueName,5000));
-            }
+            final List<Future<Object>> propertyValueFutures = inputParams.getPropertyValueNames().stream()
+                    .map(propertyValueName -> Patterns.ask(propertyValueByNameActorRef, propertyValueName, 5000)).collect(Collectors.toList());
 
-            final Future<Iterable<Object>> propertyValuesSeq = Futures.sequence(propertyValueFutures, context.dispatcher());
+            final Future<Iterable<Object>> propertyValueFuturesSeq = Futures.sequence(propertyValueFutures, context.dispatcher());
 
-            categoryByNameFuture.onSuccess(new OnSuccess<Object>() {
+            categoryByNameFuture.onComplete(new OnComplete<Object>() {
 
                 @Override
-                public void onSuccess(Object result) throws Throwable {
+                public void onComplete(Throwable failure, Object success) throws Throwable {
 
-                    final CategoryDto categoryDto = (CategoryDto) result;
+                    if (failure != null) {
+                        sender.tell(new Status.Failure(failure),self);
+                    } else {
+                        final CategoryDto categoryDto = (CategoryDto) success;
 
-                    propertyValuesSeq.onSuccess(new OnSuccess<Iterable<Object>>(){
+                        propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<Object>>(){
 
-                        @Override
-                        public void onSuccess(Iterable<Object> result) throws Throwable {
+                            @Override
+                            public void onComplete(Throwable failure, Iterable<Object> success) throws Throwable {
 
-                            getProducts(categoryDto.getId(), groupPropertyValueIds(result), sender, self);
-                        }
-                    }, context.dispatcher());
+                                if(failure!=null) {
+                                    sender.tell(new Status.Failure(failure),self);
+                                } else {
+                                    getProducts(categoryDto.getId(), groupPropertyValueIds(success), sender, self);
+                                }
+                            }
+                        },context.dispatcher());
+                    }
                 }
             }, context.dispatcher());
-        } else {
-            unhandled(message);
-        }
+        }).build());
     }
 
     private Map<Long, List<Long>> groupPropertyValueIds(Iterable<Object> result) {
 
-        Map<Long,List<Long>>resultMap=new HashMap<>();
+        Map<Long, List<Long>> resultMap = new HashMap<>();
 
         result.forEach(resultItem -> {
             PropertyValueDto propertyValue = (PropertyValueDto) resultItem;
@@ -88,11 +89,11 @@ public class GetProductsByCategoryAndFilter extends UntypedActor {
 
         final StringBuilder queryBuilder = new StringBuilder("select * from product as prod where category_id=").append(categoryId);
 
-        propertyValueIds.values().forEach(ids->{
+        propertyValueIds.values().forEach(ids -> {
             queryBuilder.append(" and exists (select * from product_property_value where prod.id=product_id and propertyvalues_id in (");
             for (int i = 0; i < ids.size(); i++) {
                 queryBuilder.append(ids.get(i));
-                if (i!=ids.size()-1)
+                if (i != ids.size() - 1)
                     queryBuilder.append(",");
             }
             queryBuilder.append("))");

@@ -1,10 +1,11 @@
 package controllers;
 
-import actors.GetProductsByCategoryAndFilter;
+import actors.GetProductsByCategoryAndFilterActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
+import dto.ErrorrResponseDto;
 import dto.ListResponseDto;
 import dto.ProductDto;
 import play.libs.Akka;
@@ -25,14 +26,15 @@ public class ProductController extends Controller {
 
         final JsonNode bodyAsJson = request().body().asJson();
 
-        final ActorRef actorRef = Akka.system().actorOf(Props.create(GetProductsByCategoryAndFilter.class));
+        final ActorRef actorRef = Akka.system().actorOf(Props.create(GetProductsByCategoryAndFilterActor.class));
 
         final ArrayList<String> propertyValues = new ArrayList<>();
         bodyAsJson.get("propertyValues").forEach(itm->propertyValues.add(itm.asText()));
 
-        return Promise.wrap(Patterns.ask(actorRef,new GetProductsByCategoryAndFilter.Message(categoryName,propertyValues),5000)).map(res-> {
-            List<ProductDto>products=(List<ProductDto>)res;
+        final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef, new GetProductsByCategoryAndFilterActor.Message(categoryName, propertyValues), 5000)).map(res -> {
+            List<ProductDto> products = (List<ProductDto>) res;
             return ok(Json.toJson(new ListResponseDto<>(products)));
         });
+        return promiseResult.recover(error -> ok(Json.toJson(new ErrorrResponseDto(error.getMessage()))));
     }
 }
