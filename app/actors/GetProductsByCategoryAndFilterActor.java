@@ -30,7 +30,7 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
         categoryByNameActorRef = getContext().actorOf(Props.create(GetCategoryByNameActor.class));
         propertyValueByNameActorRef = getContext().actorOf(Props.create(GetPropertyValueByNameActor.class));
 
-        receive(ReceiveBuilder.match(Message.class,inputParams->{
+        receive(ReceiveBuilder.match(Message.class, inputParams -> {
             final ActorRef self = self();
             final ActorRef sender = sender();
             final ActorContext context = context();
@@ -48,22 +48,23 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
                 public void onComplete(Throwable failure, Object success) throws Throwable {
 
                     if (failure != null) {
-                        sender.tell(new Status.Failure(failure),self);
+                        sender.tell(new Status.Failure(failure), self);
                     } else {
                         final CategoryDto categoryDto = (CategoryDto) success;
 
-                        propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<Object>>(){
+                        propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<Object>>() {
 
                             @Override
                             public void onComplete(Throwable failure, Iterable<Object> success) throws Throwable {
 
-                                if(failure!=null) {
-                                    sender.tell(new Status.Failure(failure),self);
+                                if (failure != null) {
+                                    sender.tell(new Status.Failure(failure), self);
                                 } else {
-                                    getProducts(categoryDto.getId(), groupPropertyValueIds(success), sender, self);
+                                    getProducts(categoryDto.getId(), groupPropertyValueIds(success), inputParams.getFirst(),
+                                            inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc(), sender, self);
                                 }
                             }
-                        },context.dispatcher());
+                        }, context.dispatcher());
                     }
                 }
             }, context.dispatcher());
@@ -87,7 +88,8 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
         return resultMap;
     }
 
-    private void getProducts(Long categoryId, Map<Long, List<Long>> propertyValueIds, ActorRef sender, ActorRef self) {
+    private void getProducts(Long categoryId, Map<Long, List<Long>> propertyValueIds, Integer first, Integer max,
+                             String orderProperty, Boolean isAsc, ActorRef sender, ActorRef self) {
 
         final StringBuilder queryBuilder = new StringBuilder("select * from product as prod where category_id=").append(categoryId);
 
@@ -98,7 +100,10 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
                 if (i != ids.size() - 1)
                     queryBuilder.append(",");
             }
-            queryBuilder.append("))");
+            queryBuilder.append("))").append(" order by ").append(orderProperty);
+            if (!isAsc)
+                queryBuilder.append(" desc");
+            queryBuilder.append(" limit ").append(max).append(" offset ").append(first);
         });
 
         MyConnectionPool.db.query(queryBuilder.toString(),
@@ -116,10 +121,18 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
     public static class Message {
         private String categoryName;
         private List<String> propertyValueNames;
+        private Integer first;
+        private Integer max;
+        private String orderProperty;
+        private Boolean isAsc;
 
-        public Message(String name, List<String> propertyValueNames) {
-            this.categoryName = name;
+        public Message(String categoryName, List<String> propertyValueNames, Integer first, Integer max, String orderProperty, Boolean isAsc) {
+            this.categoryName = categoryName;
             this.propertyValueNames = propertyValueNames;
+            this.first = first;
+            this.max = max;
+            this.orderProperty = orderProperty;
+            this.isAsc = isAsc;
         }
 
         public String getCategoryName() {
@@ -128,6 +141,22 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
 
         public List<String> getPropertyValueNames() {
             return propertyValueNames;
+        }
+
+        public Integer getFirst() {
+            return first;
+        }
+
+        public Integer getMax() {
+            return max;
+        }
+
+        public String getOrderProperty() {
+            return orderProperty;
+        }
+
+        public Boolean getIsAsc() {
+            return isAsc;
         }
     }
 }
