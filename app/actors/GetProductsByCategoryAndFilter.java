@@ -95,7 +95,7 @@ public class GetProductsByCategoryAndFilter extends UntypedActor {
                 if (i!=ids.size()-1)
                     queryBuilder.append(",");
             }
-            queryBuilder.append(")");
+            queryBuilder.append("))");
         });
 
         MyConnectionPool.db.query(queryBuilder.toString(),
