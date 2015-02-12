@@ -3,7 +3,6 @@ package actors;
 import akka.actor.*;
 import akka.dispatch.Futures;
 import akka.dispatch.OnComplete;
-import akka.dispatch.OnSuccess;
 import akka.japi.pf.ReceiveBuilder;
 import akka.pattern.Patterns;
 import db.MyConnectionPool;
@@ -12,7 +11,10 @@ import dto.ProductDto;
 import dto.PropertyValueDto;
 import scala.concurrent.Future;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
