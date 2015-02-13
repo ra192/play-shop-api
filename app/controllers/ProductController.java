@@ -5,7 +5,7 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
-import dto.ErrorrResponseDto;
+import dto.ErrorResponseDto;
 import play.libs.Akka;
 import play.libs.F.Promise;
 import play.libs.Json;
@@ -35,6 +35,6 @@ public class ProductController extends Controller {
 
         final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
                 new GetProductsByCategoryAndFilterActor.Message(categoryName, propertyValues, first, max, orderProperty, isAsk), 5000)).map(res -> ok(Json.toJson(res)));
-        return promiseResult.recover(error -> ok(Json.toJson(new ErrorrResponseDto(error.getMessage()))));
+        return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
 }

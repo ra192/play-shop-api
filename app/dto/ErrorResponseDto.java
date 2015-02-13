@@ -3,10 +3,10 @@ package dto;
 /**
  * Created by yakov_000 on 12.02.2015.
  */
-public class ErrorrResponseDto {
+public class ErrorResponseDto {
     private String error;
 
-    public ErrorrResponseDto(String error) {
+    public ErrorResponseDto(String error) {
         this.error = error;
     }
 
