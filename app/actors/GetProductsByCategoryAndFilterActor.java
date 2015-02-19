@@ -1,10 +1,13 @@
 package actors;
 
-import akka.actor.*;
+import akka.actor.AbstractActor;
+import akka.actor.ActorContext;
+import akka.actor.ActorRef;
+import akka.actor.Status;
 import akka.dispatch.Futures;
 import akka.dispatch.OnComplete;
 import akka.japi.pf.ReceiveBuilder;
-import akka.pattern.Patterns;
+import dao.CategoryDao;
 import dao.PropertyDao;
 import db.MyConnectionPool;
 import dto.CategoryDto;
@@ -24,33 +27,28 @@ import java.util.stream.Collectors;
  */
 public class GetProductsByCategoryAndFilterActor extends AbstractActor {
 
-    private final ActorRef categoryByNameActorRef;
-
     public GetProductsByCategoryAndFilterActor() {
-
-        categoryByNameActorRef = getContext().actorOf(Props.create(GetCategoryByNameActor.class));
 
         receive(ReceiveBuilder.match(Message.class, inputParams -> {
             final ActorRef self = self();
             final ActorRef sender = sender();
             final ActorContext context = context();
 
-            final Future<Object> categoryByNameFuture = Patterns.ask(categoryByNameActorRef, inputParams.getCategoryName(), 5000);
+            final Future<CategoryDto> categoryByNameFuture = CategoryDao.getCategoryByName(inputParams.getCategoryName());
 
             final List<Future<PropertyValueDto>> propertyValueFutures = inputParams.getPropertyValueNames().stream()
                     .map(PropertyDao::getPropertyValueByName).collect(Collectors.toList());
 
             final Future<Iterable<PropertyValueDto>> propertyValueFuturesSeq = Futures.sequence(propertyValueFutures, context.dispatcher());
 
-            categoryByNameFuture.onComplete(new OnComplete<Object>() {
+            categoryByNameFuture.onComplete(new OnComplete<CategoryDto>() {
 
                 @Override
-                public void onComplete(Throwable failure, Object success) throws Throwable {
+                public void onComplete(Throwable failure, CategoryDto categoryDto) throws Throwable {
 
                     if (failure != null) {
                         sender.tell(new Status.Failure(failure), self);
                     } else {
-                        final CategoryDto categoryDto = (CategoryDto) success;
 
                         propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<PropertyValueDto>>() {
 
