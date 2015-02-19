@@ -37,29 +37,35 @@ public class GetCategoriesByParentActor extends AbstractActor {
                 @Override
                 public void onComplete(Throwable failure, List<CategoryDto> categories) throws Throwable {
 
-                    if (failure != null) sender.tell(new Status.Failure(failure), self);
+                    if (failure != null)
+                        sender.tell(new Status.Failure(failure), self);
+                    else {
+                        List<Future<List<CategoryDto>>> futures = new ArrayList<>();
+                        categories.forEach(category -> {
+                                    final Future<List<CategoryDto>> childCategoriesFuture = CategoryDao.listByParentId(category.getId());
+                                    childCategoriesFuture.onComplete(new OnComplete<List<CategoryDto>>() {
 
-                    List<Future<List<CategoryDto>>> futures = new ArrayList<>();
-                    categories.forEach(category -> {
-                                final Future<List<CategoryDto>> childCategoriesFuture = CategoryDao.listByParentId(category.getId());
-                                childCategoriesFuture.onComplete(new OnComplete<List<CategoryDto>>() {
+                                        @Override
+                                        public void onComplete(Throwable failure, List<CategoryDto> categories) throws Throwable {
+                                            if (failure != null)
+                                                sender.tell(new Status.Failure(failure), self);
+                                            else
+                                                category.getChildren().addAll(categories);
+                                        }
+                                    }, system.dispatcher());
+                                    futures.add(childCategoriesFuture);
+                                }
+                        );
+                        Futures.sequence(futures, system.dispatcher()).onComplete(new OnComplete<Iterable<List<CategoryDto>>>() {
 
-                                    @Override
-                                    public void onComplete(Throwable failure, List<CategoryDto> categories) throws Throwable {
-                                        category.getChildren().addAll(categories);
-                                    }
-                                }, system.dispatcher());
-                                futures.add(childCategoriesFuture);
+                            @Override
+                            public void onComplete(Throwable failure, Iterable<List<CategoryDto>> success) throws Throwable {
+                                sender.tell(categories, self);
                             }
-                    );
-                    Futures.sequence(futures, system.dispatcher()).onComplete(new OnComplete<Iterable<List<CategoryDto>>>() {
-
-                        @Override
-                        public void onComplete(Throwable failure, Iterable<List<CategoryDto>> success) throws Throwable {
-                            sender.tell(categories, self);
-                        }
-                    }, system.dispatcher());
+                        }, system.dispatcher());
+                    }
                 }
+
             }, system.dispatcher());
 
         }).build());

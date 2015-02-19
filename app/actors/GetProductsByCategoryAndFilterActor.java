@@ -5,15 +5,17 @@ import akka.actor.ActorContext;
 import akka.actor.ActorRef;
 import akka.actor.Status;
 import akka.dispatch.Futures;
+import akka.dispatch.Mapper;
 import akka.dispatch.OnComplete;
 import akka.japi.pf.ReceiveBuilder;
 import dao.CategoryDao;
+import dao.ProductDao;
 import dao.PropertyDao;
-import db.MyConnectionPool;
 import dto.CategoryDto;
 import dto.ListResponseWithCountDto;
 import dto.ProductDto;
 import dto.PropertyValueDto;
+import scala.Tuple2;
 import scala.concurrent.Future;
 
 import java.util.ArrayList;
@@ -44,7 +46,7 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
             categoryByNameFuture.onComplete(new OnComplete<CategoryDto>() {
 
                 @Override
-                public void onComplete(Throwable failure, CategoryDto categoryDto) throws Throwable {
+                public void onComplete(Throwable failure, CategoryDto category) throws Throwable {
 
                     if (failure != null) {
                         sender.tell(new Status.Failure(failure), self);
@@ -58,8 +60,27 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
                                 if (failure != null) {
                                     sender.tell(new Status.Failure(failure), self);
                                 } else {
-                                    getProducts(categoryDto.getId(), groupPropertyValueIds(success), inputParams.getFirst(),
-                                            inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc(), sender, self);
+                                    final Map<Long, List<Long>> propertyValueIds = groupPropertyValueIds(success);
+                                    final Future<ListResponseWithCountDto> resultFuture =
+                                            ProductDao.listByCategoryIdAndPropertyValues(category.getId(), propertyValueIds, inputParams.getFirst(),
+                                                    inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc())
+                                                    .zip(ProductDao.countByCategoryIdAndPropertyValues(category.getId(), propertyValueIds))
+                                                    .map(new Mapper<Tuple2<List<ProductDto>, Long>, ListResponseWithCountDto>() {
+                                                        @Override
+                                                        public ListResponseWithCountDto apply(Tuple2<List<ProductDto>, Long> parameter) {
+                                                            return new ListResponseWithCountDto(parameter._1(),parameter._2());
+                                                        }
+                                                    }, context.dispatcher());
+                                    resultFuture.onComplete(new OnComplete<ListResponseWithCountDto>() {
+
+                                        @Override
+                                        public void onComplete(Throwable failure, ListResponseWithCountDto success) throws Throwable {
+                                            if(failure!=null)
+                                                sender.tell(new Status.Failure(failure), self);
+                                            else
+                                                sender.tell(success,self);
+                                        }
+                                    },context.dispatcher());
                                 }
                             }
                         }, context.dispatcher());
@@ -83,55 +104,6 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
             resultMapValue.add(resultItem.getId());
         });
         return resultMap;
-    }
-
-    private void getProducts(Long categoryId, Map<Long, List<Long>> propertyValueIds, Integer first, Integer max,
-                             String orderProperty, Boolean isAsc, ActorRef sender, ActorRef self) {
-
-        final StringBuilder queryBuilder = new StringBuilder("select * from product as prod where category_id=").append(categoryId);
-
-        buildPropertyValuesSubqueries(propertyValueIds, queryBuilder);
-        queryBuilder.append(" order by ").append(orderProperty);
-        if (!isAsc)
-            queryBuilder.append(" desc");
-        queryBuilder.append(" limit ").append(max).append(" offset ").append(first);
-
-        MyConnectionPool.db.query(queryBuilder.toString(),
-                queryRes -> {
-                    List<ProductDto> products = new ArrayList<>();
-                    queryRes.forEach(row -> products.add(new ProductDto(row.getLong("id"),
-                            row.getString("code"), row.getString("displayName"),
-                            row.getBigDecimal("price").doubleValue(), row.getString("description"),
-                            row.getString("imageUrl"))));
-                    getProductsCount(categoryId, propertyValueIds, products, sender, self);
-                },
-                error -> sender.tell(new Status.Failure(error), self));
-    }
-
-    private void getProductsCount(Long categoryId, Map<Long, List<Long>> propertyValueIds, List<ProductDto> products, ActorRef sender, ActorRef self) {
-
-        final StringBuilder queryBuilder = new StringBuilder("select count(*) from product as prod where category_id=").append(categoryId);
-
-        buildPropertyValuesSubqueries(propertyValueIds, queryBuilder);
-
-        MyConnectionPool.db.query(queryBuilder.toString(),
-                queryRes -> {
-                    final Long count = queryRes.row(0).getLong(0);
-                    sender.tell(new ListResponseWithCountDto(products, count), self);
-                },
-                error -> sender.tell(new Status.Failure(error), self));
-    }
-
-    private void buildPropertyValuesSubqueries(Map<Long, List<Long>> propertyValueIds, StringBuilder queryBuilder) {
-        propertyValueIds.values().forEach(ids -> {
-            queryBuilder.append(" and exists (select * from product_property_value where prod.id=product_id and propertyvalues_id in (");
-            for (int i = 0; i < ids.size(); i++) {
-                queryBuilder.append(ids.get(i));
-                if (i != ids.size() - 1)
-                    queryBuilder.append(",");
-            }
-            queryBuilder.append("))");
-        });
     }
 
     public static class Message {
