@@ -5,6 +5,7 @@ import akka.dispatch.Futures;
 import akka.dispatch.OnComplete;
 import akka.japi.pf.ReceiveBuilder;
 import akka.pattern.Patterns;
+import dao.PropertyDao;
 import db.MyConnectionPool;
 import dto.CategoryDto;
 import dto.ListResponseWithCountDto;
@@ -24,12 +25,10 @@ import java.util.stream.Collectors;
 public class GetProductsByCategoryAndFilterActor extends AbstractActor {
 
     private final ActorRef categoryByNameActorRef;
-    private final ActorRef propertyValueByNameActorRef;
 
     public GetProductsByCategoryAndFilterActor() {
 
         categoryByNameActorRef = getContext().actorOf(Props.create(GetCategoryByNameActor.class));
-        propertyValueByNameActorRef = getContext().actorOf(Props.create(GetPropertyValueByNameActor.class));
 
         receive(ReceiveBuilder.match(Message.class, inputParams -> {
             final ActorRef self = self();
@@ -38,10 +37,10 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
 
             final Future<Object> categoryByNameFuture = Patterns.ask(categoryByNameActorRef, inputParams.getCategoryName(), 5000);
 
-            final List<Future<Object>> propertyValueFutures = inputParams.getPropertyValueNames().stream()
-                    .map(propertyValueName -> Patterns.ask(propertyValueByNameActorRef, propertyValueName, 5000)).collect(Collectors.toList());
+            final List<Future<PropertyValueDto>> propertyValueFutures = inputParams.getPropertyValueNames().stream()
+                    .map(PropertyDao::getPropertyValueByName).collect(Collectors.toList());
 
-            final Future<Iterable<Object>> propertyValueFuturesSeq = Futures.sequence(propertyValueFutures, context.dispatcher());
+            final Future<Iterable<PropertyValueDto>> propertyValueFuturesSeq = Futures.sequence(propertyValueFutures, context.dispatcher());
 
             categoryByNameFuture.onComplete(new OnComplete<Object>() {
 
@@ -53,10 +52,10 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
                     } else {
                         final CategoryDto categoryDto = (CategoryDto) success;
 
-                        propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<Object>>() {
+                        propertyValueFuturesSeq.onComplete(new OnComplete<Iterable<PropertyValueDto>>() {
 
                             @Override
-                            public void onComplete(Throwable failure, Iterable<Object> success) throws Throwable {
+                            public void onComplete(Throwable failure, Iterable<PropertyValueDto> success) throws Throwable {
 
                                 if (failure != null) {
                                     sender.tell(new Status.Failure(failure), self);
@@ -72,19 +71,18 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
         }).build());
     }
 
-    private Map<Long, List<Long>> groupPropertyValueIds(Iterable<Object> result) {
+    private Map<Long, List<Long>> groupPropertyValueIds(Iterable<PropertyValueDto> result) {
 
         Map<Long, List<Long>> resultMap = new HashMap<>();
 
         result.forEach(resultItem -> {
-            PropertyValueDto propertyValue = (PropertyValueDto) resultItem;
 
-            List<Long> resultMapValue = resultMap.get(propertyValue.getPropertyId());
+            List<Long> resultMapValue = resultMap.get(resultItem.getPropertyId());
             if (resultMapValue == null) {
                 resultMapValue = new ArrayList<>();
-                resultMap.put(propertyValue.getPropertyId(), resultMapValue);
+                resultMap.put(resultItem.getPropertyId(), resultMapValue);
             }
-            resultMapValue.add(propertyValue.getId());
+            resultMapValue.add(resultItem.getId());
         });
         return resultMap;
     }
