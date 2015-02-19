@@ -34,7 +34,7 @@ public class GetProductsByCategoryAndFilterActor extends AbstractActor {
             final ActorRef sender = sender();
             final ActorContext context = context();
 
-            final Future<CategoryDto> categoryByNameFuture = CategoryDao.getCategoryByName(inputParams.getCategoryName());
+            final Future<CategoryDto> categoryByNameFuture = CategoryDao.getByName(inputParams.getCategoryName());
 
             final List<Future<PropertyValueDto>> propertyValueFutures = inputParams.getPropertyValueNames().stream()
                     .map(PropertyDao::getPropertyValueByName).collect(Collectors.toList());

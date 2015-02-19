@@ -1,6 +1,5 @@
 package dao;
 
-import akka.actor.Status;
 import akka.dispatch.Futures;
 import db.MyConnectionPool;
 import dto.PropertyValueDto;
@@ -27,7 +26,7 @@ public class PropertyDao {
                         promise.failure(new Exception("Property value with specified name doesn't exist"));
                     }
                 },
-                error -> promise.failure(error));
+                promise::failure);
 
         return promise.future();
     }
