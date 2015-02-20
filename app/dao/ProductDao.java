@@ -3,12 +3,12 @@ package dao;
 import akka.dispatch.Futures;
 import db.MyConnectionPool;
 import dto.ProductDto;
+import dto.PropertyValueWithCountDto;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by yakov_000 on 19.02.2015.
@@ -54,6 +54,61 @@ public class ProductDao {
                 queryRes -> {
                     final Long count = queryRes.row(0).getLong(0);
                     promise.success(count);
+                },
+                promise::failure);
+
+        return promise.future();
+    }
+
+    public static Future<Map<String, List<PropertyValueWithCountDto>>> countPropertyValuesByCategoryIdAndFilter(Long categoryId, Long propertyId, Map<Long, List<Long>> propertyValueIds) {
+
+        final Promise<Map<String, List<PropertyValueWithCountDto>>> promise = Futures.promise();
+
+        final StringBuilder queryBuilder = new StringBuilder("select prop.id as prop_id, prop.name as prop_name, propval.id as propval_id,")
+                .append(" propval.name as propval_name, propval.displayname as propval_displayname, count(*) from product as prod")
+                .append(" inner join product_property_value as ppv on product_id=prod.id")
+                .append(" inner join property_value as propval on propval.id=ppv.propertyvalues_id")
+                .append(" inner join property as prop on prop.id=propval.property_id")
+                .append("where prod.category_id=").append(categoryId);
+
+        if (propertyId != null) {
+            queryBuilder.append(" and prop.id = ").append(propertyId);
+
+            final Map<Long, List<Long>> propertyValueIdsFiltered = propertyValueIds.entrySet().stream()
+                    .filter(ent -> ent.getKey() != propertyId).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            buildPropertyValuesSubqueries(propertyValueIdsFiltered, queryBuilder);
+        } else
+            buildPropertyValuesSubqueries(propertyValueIds, queryBuilder);
+
+        final List<Long> flatPropertyValueIds = propertyValueIds.values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+        if (!flatPropertyValueIds.isEmpty()) {
+            queryBuilder.append(" and propval.id not in (");
+            for (int i = 0; i < flatPropertyValueIds.size(); i++) {
+                queryBuilder.append(flatPropertyValueIds.get(i));
+                if (i != flatPropertyValueIds.size() - 1)
+                    queryBuilder.append(",");
+            }
+            queryBuilder.append(")");
+        }
+
+        queryBuilder.append("group by prop.name, propval.name, ppv.propertyvalues_id order by prop.name, propval.name");
+
+        MyConnectionPool.db.query(queryBuilder.toString(),
+                queryRes -> {
+                    final Map<String, List<PropertyValueWithCountDto>> result = new HashMap<>();
+                    queryRes.forEach(row -> {
+                        final String propertyName = row.getString("prop_name");
+                        List<PropertyValueWithCountDto> resultItem = result.get(propertyName);
+                        if(resultItem==null) {
+                            resultItem=new ArrayList<>();
+                            result.put(propertyName,resultItem);
+                        }
+                        resultItem.add(new PropertyValueWithCountDto(row.getLong("propval_id"),row.getString("propval_name"),
+                                row.getString("propval_displayname"),row.getLong("prop_id"),row.getLong("count")));
+                    });
+
+                    promise.success(result);
                 },
                 promise::failure);
 
