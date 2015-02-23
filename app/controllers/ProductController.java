@@ -1,5 +1,6 @@
 package controllers;
 
+import actors.CountProductPropertyValueActor;
 import actors.GetProductsByCategoryAndFilterActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -35,6 +36,20 @@ public class ProductController extends Controller {
 
         final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
                 new GetProductsByCategoryAndFilterActor.Message(categoryName, propertyValues, first, max, orderProperty, isAsk), 5000)).map(res -> ok(Json.toJson(res)));
+        return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
+    }
+
+    public static Promise<Result> countPropertiesByCategoryAndFilter(String categoryName) {
+
+        final JsonNode bodyAsJson = request().body().asJson();
+
+        final ActorRef actorRef = Akka.system().actorOf(Props.create(CountProductPropertyValueActor.class));
+
+        final ArrayList<String> propertyValues = new ArrayList<>();
+        bodyAsJson.get("propertyValues").forEach(itm -> propertyValues.add(itm.asText()));
+
+        final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
+                new CountProductPropertyValueActor.Message(categoryName, propertyValues), 5000)).map(res -> ok(Json.toJson(res)));
         return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
 }

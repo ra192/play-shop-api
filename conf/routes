@@ -3,13 +3,14 @@
 # ~~~~
 
 # Home page
-GET        /                    controllers.Application.index()
-GET        /categories.json     controllers.CategoryController.listRoots()
+GET            /                                   controllers.Application.index()
+GET            /categories.json                    controllers.CategoryController.listRoots()
 
-POST       /products/:categoryName.json     controllers.ProductController.listByCategoryAndFilter(categoryName:String)
+POST           /products/:categoryName.json        controllers.ProductController.listByCategoryAndFilter(categoryName:String)
+POST           /properties/:categoryName.json      controllers.ProductController.countPropertiesByCategoryAndFilter(categoryName:String)
 
 # Add headers to options requests for CORS
-OPTIONS    /*path                   controllers.OptionsRequestController.options(path:String)
+OPTIONS        /*path                              controllers.OptionsRequestController.options(path:String)
 
 # Map static resources from the /public folder to the /assets URL path
-GET        /assets/*file        controllers.Assets.at(path="/public", file)
+GET            /assets/*file                       controllers.Assets.at(path="/public", file)

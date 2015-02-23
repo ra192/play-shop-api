@@ -69,7 +69,7 @@ public class ProductDao {
                 .append(" inner join product_property_value as ppv on product_id=prod.id")
                 .append(" inner join property_value as propval on propval.id=ppv.propertyvalues_id")
                 .append(" inner join property as prop on prop.id=propval.property_id")
-                .append("where prod.category_id=").append(categoryId);
+                .append(" where prod.category_id=").append(categoryId);
 
         if (propertyId != null) {
             queryBuilder.append(" and prop.id = ").append(propertyId);
@@ -92,7 +92,7 @@ public class ProductDao {
             queryBuilder.append(")");
         }
 
-        queryBuilder.append("group by prop.name, propval.name, ppv.propertyvalues_id order by prop.name, propval.name");
+        queryBuilder.append(" group by prop.id, prop.name, propval.id, propval.name, ppv.propertyvalues_id order by prop.name, propval.name");
 
         MyConnectionPool.db.query(queryBuilder.toString(),
                 queryRes -> {
