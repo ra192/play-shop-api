@@ -26,7 +26,8 @@ public class GetProductsByCategoryAndFilterActor extends CategoryAndPropertyValu
     }
 
     @Override
-    protected void onReceive(Object message, CategoryDto category, Map<Long, List<Long>> propertyValueIds, ActorRef self, ActorRef sender, ActorContext context) {
+    protected void onReceive(Object message, CategoryDto category, Map<Long, List<Long>> propertyValueIds,
+                             ActorRef self, ActorRef sender, ActorContext context) {
 
         Message inputParams = (Message) message;
 

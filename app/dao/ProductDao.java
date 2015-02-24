@@ -1,8 +1,10 @@
 package dao;
 
 import akka.dispatch.Futures;
+import com.github.pgasync.Row;
 import db.MyConnectionPool;
 import dto.ProductDto;
+import dto.PropertyDto;
 import dto.PropertyValueWithCountDto;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
@@ -60,12 +62,12 @@ public class ProductDao {
         return promise.future();
     }
 
-    public static Future<Map<String, List<PropertyValueWithCountDto>>> countPropertyValuesByCategoryIdAndFilter(Long categoryId, Long propertyId, Map<Long, List<Long>> propertyValueIds) {
+    public static Future<List<PropertyDto>> countPropertyValuesByCategoryIdAndFilter(Long categoryId, Long propertyId, Map<Long, List<Long>> propertyValueIds) {
 
-        final Promise<Map<String, List<PropertyValueWithCountDto>>> promise = Futures.promise();
+        final Promise<List<PropertyDto>> promise = Futures.promise();
 
-        final StringBuilder queryBuilder = new StringBuilder("select prop.id as prop_id, prop.name as prop_name, propval.id as propval_id,")
-                .append(" propval.name as propval_name, propval.displayname as propval_displayname, count(*) from product as prod")
+        final StringBuilder queryBuilder = new StringBuilder("select prop.id as prop_id, prop.name as prop_name, prop.displayname as prop_displayname,")
+                .append(" propval.id as propval_id, propval.name as propval_name, propval.displayname as propval_displayname, count(*) from product as prod")
                 .append(" inner join product_property_value as ppv on product_id=prod.id")
                 .append(" inner join property_value as propval on propval.id=ppv.propertyvalues_id")
                 .append(" inner join property as prop on prop.id=propval.property_id")
@@ -75,7 +77,7 @@ public class ProductDao {
             queryBuilder.append(" and prop.id = ").append(propertyId);
 
             final Map<Long, List<Long>> propertyValueIdsFiltered = propertyValueIds.entrySet().stream()
-                    .filter(ent -> ent.getKey() != propertyId).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    .filter(ent -> !ent.getKey().equals(propertyId)).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             buildPropertyValuesSubqueries(propertyValueIdsFiltered, queryBuilder);
         } else
@@ -92,21 +94,21 @@ public class ProductDao {
             queryBuilder.append(")");
         }
 
-        queryBuilder.append(" group by prop.id, prop.name, propval.id, propval.name, ppv.propertyvalues_id order by prop.name, propval.name");
+        queryBuilder.append(" group by prop.id, prop.name, prop.displayname, propval.id, propval.name, propval.displayname, ppv.propertyvalues_id order by prop.displayname, propval.displayname");
 
         MyConnectionPool.db.query(queryBuilder.toString(),
                 queryRes -> {
-                    final Map<String, List<PropertyValueWithCountDto>> result = new HashMap<>();
-                    queryRes.forEach(row -> {
-                        final String propertyName = row.getString("prop_name");
-                        List<PropertyValueWithCountDto> resultItem = result.get(propertyName);
-                        if(resultItem==null) {
-                            resultItem=new ArrayList<>();
-                            result.put(propertyName,resultItem);
+                    final List<PropertyDto>result=new ArrayList<>();
+                    PropertyDto resultItem=null;
+                    for(Row row:queryRes) {
+                        if(resultItem==null||!resultItem.getId().equals(row.getLong("prop_id"))) {
+                            resultItem=new PropertyDto(row.getLong("prop_id"), row.getString("prop_name"), row.getString("prop_displayname"));
+                            result.add(resultItem);
                         }
-                        resultItem.add(new PropertyValueWithCountDto(row.getLong("propval_id"),row.getString("propval_name"),
+
+                        resultItem.getPropertyValues().add(new PropertyValueWithCountDto(row.getLong("propval_id"),row.getString("propval_name"),
                                 row.getString("propval_displayname"),row.getLong("prop_id"),row.getLong("count")));
-                    });
+                    }
 
                     promise.success(result);
                 },
