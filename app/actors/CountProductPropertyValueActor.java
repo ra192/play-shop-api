@@ -7,12 +7,12 @@ import akka.dispatch.Futures;
 import akka.dispatch.OnComplete;
 import dao.ProductDao;
 import dto.CategoryDto;
+import dto.ListResponseDto;
 import dto.PropertyDto;
 import scala.Tuple2;
 import scala.concurrent.Future;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -50,9 +50,16 @@ public class CountProductPropertyValueActor extends CategoryAndPropertyValuesBas
         }, context.dispatcher());
     }
 
-    private Object createResponse(List<PropertyDto> properties, Iterable<List<PropertyDto>> additionalProperties) {
+    private ListResponseDto<ResponseItem> createResponse(List<PropertyDto> properties, Iterable<List<PropertyDto>> additionalProperties) {
 
-        return properties;
+        Set<ResponseItem>itemSet=new TreeSet<>((o1,o2)->o1.getDisplayName().compareTo(o2.getDisplayName()));
+
+        properties.stream().map(itm -> new ResponseItem(itm, false)).forEach(itemSet::add);
+        for(List<PropertyDto>additionalPropertiesItem:additionalProperties) {
+            additionalPropertiesItem.stream().map(itm -> new ResponseItem(itm, true)).forEach(itemSet::add);
+        }
+
+        return new ListResponseDto<>(new ArrayList<>(itemSet));
     }
 
     public static class Message extends BaseMessage {
@@ -62,7 +69,18 @@ public class CountProductPropertyValueActor extends CategoryAndPropertyValuesBas
         }
     }
 
-    public static class Response {
+    public static class ResponseItem extends PropertyDto {
 
+        private final Boolean isAdditional;
+
+        public ResponseItem(PropertyDto propertyDto, Boolean isAdditional) {
+            super(propertyDto.getId(), propertyDto.getName(), propertyDto.getDisplayName());
+            getPropertyValues().addAll(propertyDto.getPropertyValues());
+            this.isAdditional=isAdditional;
+        }
+
+        public Boolean getIsAdditional() {
+            return isAdditional;
+        }
     }
 }
