@@ -2,7 +2,7 @@ package dao;
 
 import akka.dispatch.Futures;
 import db.MyConnectionPool;
-import dto.CategoryDto;
+import model.Category;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
 
@@ -15,15 +15,15 @@ import java.util.List;
  */
 public class CategoryDao {
 
-    public static Future<CategoryDto> getByName(String name) {
+    public static Future<Category> getByName(String name) {
 
-        final Promise<CategoryDto> promise = Futures.promise();
+        final Promise<Category> promise = Futures.promise();
 
         MyConnectionPool.db.query("select * from category where name=$1", Arrays.asList(name),
                 result -> {
                     if (result.size() > 0) {
-                        final CategoryDto category = new CategoryDto(result.row(0).getLong("id"),
-                                result.row(0).getString("name"), result.row(0).getString("displayName"));
+                        final Category category = new Category(result.row(0).getLong("id"), result.row(0).getString("name"),
+                                result.row(0).getString("displayName"),result.row(0).getLong("parent_id"));
 
                         promise.success(category);
                     } else {
@@ -36,21 +36,21 @@ public class CategoryDao {
         return promise.future();
     }
 
-    public static Future<List<CategoryDto>> listByParentId(Long parentId) {
+    public static Future<List<Category>> listByParentId(Long parentId) {
 
-        final Promise<List<CategoryDto>> promise = Futures.promise();
+        final Promise<List<Category>> promise = Futures.promise();
 
         final String query = (parentId == 0) ? "select * from category where parent_id is null" :
                 "select * from category where parent_id = ".concat(parentId.toString());
 
         MyConnectionPool.db.query(query,
                 result-> {
-                    final List<CategoryDto> categories = new ArrayList<>();
+                    final List<Category> categories = new ArrayList<>();
 
 
                     result.forEach(row -> {
-                        final CategoryDto category = new CategoryDto(row.getLong("id"), row.getString("name"),
-                                row.getString("displayname"));
+                        final Category category = new Category(row.getLong("id"), row.getString("name"),
+                                row.getString("displayname"),row.getLong("parent_id"));
                         categories.add(category);
                     });
 

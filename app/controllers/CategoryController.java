@@ -1,6 +1,6 @@
 package controllers;
 
-import actors.GetCategoriesByParentActor;
+import actors.ListCategoriesByParentActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.pattern.Patterns;
@@ -24,7 +24,7 @@ public class CategoryController extends Controller {
 
     public static Promise<Result> listRoots() {
 
-        final ActorRef actorRef = Akka.system().actorOf(Props.create(GetCategoriesByParentActor.class));
+        final ActorRef actorRef = Akka.system().actorOf(Props.create(ListCategoriesByParentActor.class));
 
         return Promise.wrap(Patterns.ask(actorRef, new Long(0), 5000)).map(res->{
             List<CategoryDto>categories= (List<CategoryDto>) res;

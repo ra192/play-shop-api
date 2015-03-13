@@ -1,28 +1,32 @@
 package dto;
 
+import model.Category;
+import model.Product;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Created by yakov_000 on 09.02.2015.
  */
 public class ProductDto {
 
-    private Long id;
     private String code;
     private String displayName;
     private Double price;
     private String description;
     private String imageUrl;
+    private String category;
+    private List<String> propertyValues;
 
-    public ProductDto(Long id, String code, String displayName, Double price, String description, String imageUrl) {
-        this.id = id;
-        this.code = code;
-        this.displayName = displayName;
-        this.price = price;
-        this.description = description;
-        this.imageUrl = imageUrl;
-    }
-
-    public Long getId() {
-        return id;
+    public ProductDto(Product product, Category category) {
+        this.code = product.getCode();
+        this.displayName = product.getDisplayName();
+        this.price = product.getPrice();
+        this.description = product.getDescription();
+        this.imageUrl = product.getImageUrl();
+        this.category=category.getName();
+        this.propertyValues=new ArrayList<>();
     }
 
     public String getCode() {
@@ -43,5 +47,13 @@ public class ProductDto {
 
     public String getImageUrl() {
         return imageUrl;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public List<String> getPropertyValues() {
+        return propertyValues;
     }
 }

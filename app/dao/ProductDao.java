@@ -1,15 +1,17 @@
 package dao;
 
 import akka.dispatch.Futures;
+import com.github.pgasync.ResultSet;
 import com.github.pgasync.Row;
 import db.MyConnectionPool;
-import dto.ProductDto;
 import dto.PropertyDto;
 import dto.PropertyValueWithCountDto;
+import model.Product;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -17,10 +19,10 @@ import java.util.stream.Collectors;
  */
 public class ProductDao {
 
-    public static Future<List<ProductDto>> listByCategoryIdAndPropertyValues(Long categoryId, Map<Long, List<Long>> propertyValueIds,
-                                                                             Integer first, Integer max, String orderProperty, Boolean isAsc) {
+    public static Future<List<Product>> listByCategoryIdAndPropertyValues(Long categoryId, Map<Long, List<Long>> propertyValueIds,
+                                                                          Integer first, Integer max, String orderProperty, Boolean isAsc) {
 
-        final Promise<List<ProductDto>> promise = Futures.promise();
+        final Promise<List<Product>> promise = Futures.promise();
 
         final StringBuilder queryBuilder = new StringBuilder("select * from product as prod where category_id=").append(categoryId);
 
@@ -32,11 +34,11 @@ public class ProductDao {
 
         MyConnectionPool.db.query(queryBuilder.toString(),
                 queryRes -> {
-                    List<ProductDto> products = new ArrayList<>();
-                    queryRes.forEach(row -> products.add(new ProductDto(row.getLong("id"),
+                    List<Product> products = new ArrayList<>();
+                    queryRes.forEach(row -> products.add(new Product(row.getLong("id"),
                             row.getString("code"), row.getString("displayName"),
                             row.getBigDecimal("price").doubleValue(), row.getString("description"),
-                            row.getString("imageUrl"))));
+                            row.getString("imageUrl"), categoryId)));
                     promise.success(products);
                 },
                 promise::failure);
@@ -98,16 +100,16 @@ public class ProductDao {
 
         MyConnectionPool.db.query(queryBuilder.toString(),
                 queryRes -> {
-                    final List<PropertyDto>result=new ArrayList<>();
-                    PropertyDto resultItem=null;
-                    for(Row row:queryRes) {
-                        if(resultItem==null||!resultItem.getId().equals(row.getLong("prop_id"))) {
-                            resultItem=new PropertyDto(row.getLong("prop_id"), row.getString("prop_name"), row.getString("prop_displayname"));
+                    final List<PropertyDto> result = new ArrayList<>();
+                    PropertyDto resultItem = null;
+                    for (Row row : queryRes) {
+                        if (resultItem == null || !resultItem.getId().equals(row.getLong("prop_id"))) {
+                            resultItem = new PropertyDto(row.getLong("prop_id"), row.getString("prop_name"), row.getString("prop_displayname"));
                             result.add(resultItem);
                         }
 
-                        resultItem.getPropertyValues().add(new PropertyValueWithCountDto(row.getLong("propval_id"),row.getString("propval_name"),
-                                row.getString("propval_displayname"),row.getLong("prop_id"),row.getLong("count")));
+                        resultItem.getPropertyValues().add(new PropertyValueWithCountDto(row.getLong("propval_id"), row.getString("propval_name"),
+                                row.getString("propval_displayname"), row.getLong("prop_id"), row.getLong("count")));
                     }
 
                     promise.success(result);
@@ -115,6 +117,63 @@ public class ProductDao {
                 promise::failure);
 
         return promise.future();
+    }
+
+    public static Future<Long> create(Product product, Set<Long> propertyValueIds) {
+
+        final Promise<Long> promise = Futures.promise();
+
+        MyConnectionPool.db.query("select nextval('hibernate_sequence')",
+                idResult -> {
+                    Long id = idResult.row(0).getLong(0);
+
+                    String query = "INSERT INTO product(id, code, description, displayname, imageurl, price, rating,category_id)" +
+                            " VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
+
+                    MyConnectionPool.db.query(query, Arrays.asList(id, product.getCode(), product.getDescription(),
+                                    product.getDisplayName(), product.getImageUrl(), product.getPrice(), 0, product.getCategoryId()),
+                            result -> updatePropertyValues(id, propertyValueIds, res -> promise.success(id), promise::failure),
+                            promise::failure);
+
+                },
+                promise::failure);
+
+        return promise.future();
+    }
+
+    public static Future<Long> update(Product product, Set<Long> propertyValueIds) {
+
+        final Promise<Long> promise = Futures.promise();
+
+        String query = "UPDATE product SET code=$2, description=$3, displayname=$4, imageurl=$5, price=$6, rating=$7, category_id=$8 WHERE id=$1;";
+
+        MyConnectionPool.db.query(query, Arrays.asList(product.getId(), product.getCode(), product.getDescription(),
+                        product.getDisplayName(), product.getImageUrl(), product.getPrice(), 0, product.getCategoryId()),
+                result -> updatePropertyValues(product.getId(), propertyValueIds, res->promise.success(1L), promise::failure),
+                promise::failure);
+
+        return promise.future();
+    }
+
+    private static void updatePropertyValues(Long productId, Set<Long> propertyValueIds, Consumer<ResultSet> consumer, Consumer<Throwable> consumer1) {
+
+        final StringBuilder queryBuilder = new StringBuilder("delete from product_property_value where product_id = ").append(productId).append(";");
+
+        if (!propertyValueIds.isEmpty()) {
+            queryBuilder.append("INSERT INTO product_property_value(product_id, propertyvalues_id)");
+            final Iterator<Long> iterator = propertyValueIds.iterator();
+
+            while (iterator.hasNext()) {
+                Long propertyValueId = iterator.next();
+                queryBuilder.append(" VALUES (").append(productId).append(",").append(propertyValueId).append(")");
+                if (iterator.hasNext())
+                    queryBuilder.append(",");
+                else
+                    queryBuilder.append(";");
+            }
+        }
+
+        MyConnectionPool.db.query(queryBuilder.toString(),consumer,consumer1);
     }
 
     private static void buildPropertyValuesSubqueries(Map<Long, List<Long>> propertyValueIds, StringBuilder queryBuilder) {

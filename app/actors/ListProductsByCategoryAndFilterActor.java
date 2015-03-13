@@ -6,27 +6,29 @@ import akka.actor.Status;
 import akka.dispatch.Mapper;
 import akka.dispatch.OnComplete;
 import dao.ProductDao;
-import dto.CategoryDto;
 import dto.ListResponseWithCountDto;
 import dto.ProductDto;
+import model.Category;
+import model.Product;
 import scala.Tuple2;
 import scala.concurrent.Future;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Created by yakov_000 on 09.02.2015.
  */
-public class GetProductsByCategoryAndFilterActor extends CategoryAndPropertyValuesBaseActor {
+public class ListProductsByCategoryAndFilterActor extends CategoryAndPropertyValuesBaseActor {
 
-    public GetProductsByCategoryAndFilterActor() {
+    public ListProductsByCategoryAndFilterActor() {
 
         super(Message.class);
     }
 
     @Override
-    protected void onReceive(Object message, CategoryDto category, Map<Long, List<Long>> propertyValueIds,
+    protected void onReceive(Object message, Category category, Map<Long, List<Long>> propertyValueIds,
                              ActorRef self, ActorRef sender, ActorContext context) {
 
         Message inputParams = (Message) message;
@@ -35,10 +37,12 @@ public class GetProductsByCategoryAndFilterActor extends CategoryAndPropertyValu
                 ProductDao.listByCategoryIdAndPropertyValues(category.getId(), propertyValueIds, inputParams.getFirst(),
                         inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc())
                         .zip(ProductDao.countByCategoryIdAndPropertyValues(category.getId(), propertyValueIds))
-                        .map(new Mapper<Tuple2<List<ProductDto>, Long>, ListResponseWithCountDto>() {
+                        .map(new Mapper<Tuple2<List<Product>, Long>, ListResponseWithCountDto>() {
                             @Override
-                            public ListResponseWithCountDto apply(Tuple2<List<ProductDto>, Long> parameter) {
-                                return new ListResponseWithCountDto(parameter._1(), parameter._2());
+                            public ListResponseWithCountDto apply(Tuple2<List<Product>, Long> parameter) {
+                                return new ListResponseWithCountDto(parameter._1().stream().map(product ->
+                                        new ProductDto(product,category))
+                                        .collect(Collectors.toList()), parameter._2());
                             }
                         }, context.dispatcher());
         resultFuture.onComplete(new OnComplete<ListResponseWithCountDto>() {

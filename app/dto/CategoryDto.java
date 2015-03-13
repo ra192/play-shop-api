@@ -1,5 +1,7 @@
 package dto;
 
+import model.Category;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,20 +10,14 @@ import java.util.List;
  */
 public class CategoryDto {
 
-    private Long id;
-    private String name;
-    private String displayName;
-    private List<CategoryDto> children;
+    private final String name;
+    private final String displayName;
+    private final List<CategoryDto> children;
 
-    public CategoryDto(Long id, String name, String displayName) {
-        this.id = id;
-        this.name = name;
-        this.displayName = displayName;
+    public CategoryDto(Category category) {
+        this.name = category.getName();
+        this.displayName = category.getDisplayName();
         this.children = new ArrayList<>();
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getName() {

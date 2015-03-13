@@ -9,8 +9,8 @@ import akka.dispatch.OnComplete;
 import akka.japi.pf.ReceiveBuilder;
 import dao.CategoryDao;
 import dao.PropertyDao;
-import dto.CategoryDto;
-import dto.PropertyValueDto;
+import model.Category;
+import model.PropertyValue;
 import scala.Tuple2;
 import scala.concurrent.Future;
 
@@ -33,14 +33,14 @@ public abstract class CategoryAndPropertyValuesBaseActor extends AbstractActor {
             final ActorRef sender = sender();
             final ActorContext context = context();
 
-            final Future<CategoryDto> categoryFuture = CategoryDao.getByName(message.getCategoryName());
-            final Future<Iterable<PropertyValueDto>> propertyValuesFuture = Futures.sequence(message.getPropertyValueNames()
+            final Future<Category> categoryFuture = CategoryDao.getByName(message.getCategoryName());
+            final Future<Iterable<PropertyValue>> propertyValuesFuture = Futures.sequence(message.getPropertyValueNames()
                     .stream().map(PropertyDao::getPropertyValueByName).collect(Collectors.toList()), context.dispatcher());
 
-            categoryFuture.zip(propertyValuesFuture).onComplete(new OnComplete<Tuple2<CategoryDto, Iterable<PropertyValueDto>>>() {
+            categoryFuture.zip(propertyValuesFuture).onComplete(new OnComplete<Tuple2<Category, Iterable<PropertyValue>>>() {
 
                 @Override
-                public void onComplete(Throwable failure, Tuple2<CategoryDto, Iterable<PropertyValueDto>> success) throws Throwable {
+                public void onComplete(Throwable failure, Tuple2<Category, Iterable<PropertyValue>> success) throws Throwable {
                     if (failure != null)
                         sender.tell(new Status.Failure(failure), self);
                     else {
@@ -52,10 +52,10 @@ public abstract class CategoryAndPropertyValuesBaseActor extends AbstractActor {
         }).build());
     }
 
-    protected abstract void onReceive(Object message, CategoryDto category, Map<Long, List<Long>> propertyValueIds,
+    protected abstract void onReceive(Object message, Category category, Map<Long, List<Long>> propertyValueIds,
                                       ActorRef self, ActorRef sender, ActorContext context);
 
-    protected Map<Long, List<Long>> groupPropertyValueIds(Iterable<PropertyValueDto> result) {
+    protected Map<Long, List<Long>> groupPropertyValueIds(Iterable<PropertyValue> result) {
 
         Map<Long, List<Long>> resultMap = new HashMap<>();
 

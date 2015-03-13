@@ -9,6 +9,7 @@ import dao.ProductDao;
 import dto.CategoryDto;
 import dto.ListResponseDto;
 import dto.PropertyDto;
+import model.Category;
 import scala.Tuple2;
 import scala.concurrent.Future;
 
@@ -26,7 +27,7 @@ public class CountProductPropertyValueActor extends CategoryAndPropertyValuesBas
     }
 
     @Override
-    protected void onReceive(Object message, CategoryDto category, Map<Long, List<Long>> propertyValueIds,
+    protected void onReceive(Object message, Category category, Map<Long, List<Long>> propertyValueIds,
                              ActorRef self, ActorRef sender, ActorContext context) {
 
         final Future<List<PropertyDto>> filterFuture =
