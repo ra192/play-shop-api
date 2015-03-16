@@ -19,6 +19,24 @@ import java.util.stream.Collectors;
  */
 public class ProductDao {
 
+    public static Future<Product> getByCode(String code) {
+
+        final Promise<Product> promise = Futures.promise();
+
+        String query="select * from product where code = $1";
+
+        MyConnectionPool.db.query(query,Arrays.asList(code),result->{
+            if(result.size()>0)
+                promise.success(new Product(result.row(0).getLong("id"), result.row(0).getString("code"), result.row(0).getString("displayName"),
+                        result.row(0).getBigDecimal("price").doubleValue(), result.row(0).getString("description"),
+                        result.row(0).getString("imageUrl"), result.row(0).getLong("category_id")));
+            else
+                promise.failure(new Exception("Product with specified code doesn't exist"));
+        },promise::failure);
+
+        return promise.future();
+    }
+
     public static Future<List<Product>> listByCategoryIdAndPropertyValues(Long categoryId, Map<Long, List<Long>> propertyValueIds,
                                                                           Integer first, Integer max, String orderProperty, Boolean isAsc) {
 
