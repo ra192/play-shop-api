@@ -9,6 +9,7 @@ GET            /categories.json                              controllers.Categor
 POST           /products/:categoryName.json                  controllers.ProductController.listByCategoryAndFilter(categoryName:String)
 POST           /productsProperties/:categoryName.json        controllers.ProductController.countPropertiesByCategoryAndFilter(categoryName:String)
 POST           /product/create.json                          controllers.ProductController.create()
+POST           /product/update.json                          controllers.ProductController.update()
 
 # Add headers to options requests for CORS
 OPTIONS        /*path                                        controllers.OptionsRequestController.options(path:String)

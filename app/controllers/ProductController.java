@@ -87,4 +87,25 @@ public class ProductController extends Controller {
 
         return result.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
+
+    public static Promise<Result>update() {
+
+        final JsonNode jsonNode = request().body().asJson();
+
+        final Promise<Category> categoryPromise = Promise.wrap(CategoryDao.getByName(jsonNode.get("category").asText()));
+
+        List<Promise<PropertyValue>> propertyValuePromises = new ArrayList<>();
+        jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyDao.getPropertyValueByName(propVal.asText()))));
+
+        final Promise<Result> result = categoryPromise.zip(Promise.sequence(propertyValuePromises)).flatMap(res -> {
+
+            Product product = new Product(jsonNode.get("id").asLong(), jsonNode.get("code").asText(), jsonNode.get("displayName").asText(),
+                    jsonNode.get("price").asDouble(), jsonNode.get("description").asText(), jsonNode.get("imageUrl").asText(),
+                    res._1.getId());
+
+            return Promise.wrap(ProductDao.update(product, res._2.stream().map(PropertyValue::getId).collect(Collectors.toSet())));
+        }).map(res -> ok(Json.toJson("updated")));
+
+        return result.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
+    }
 }
