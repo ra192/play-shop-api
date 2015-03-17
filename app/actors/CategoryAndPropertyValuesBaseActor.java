@@ -8,7 +8,7 @@ import akka.dispatch.Futures;
 import akka.dispatch.OnComplete;
 import akka.japi.pf.ReceiveBuilder;
 import dao.CategoryDao;
-import dao.PropertyDao;
+import dao.PropertyValueDao;
 import model.Category;
 import model.PropertyValue;
 import scala.Tuple2;
@@ -35,7 +35,7 @@ public abstract class CategoryAndPropertyValuesBaseActor extends AbstractActor {
 
             final Future<Category> categoryFuture = CategoryDao.getByName(message.getCategoryName());
             final Future<Iterable<PropertyValue>> propertyValuesFuture = Futures.sequence(message.getPropertyValueNames()
-                    .stream().map(PropertyDao::getPropertyValueByName).collect(Collectors.toList()), context.dispatcher());
+                    .stream().map(PropertyValueDao::getByName).collect(Collectors.toList()), context.dispatcher());
 
             categoryFuture.zip(propertyValuesFuture).onComplete(new OnComplete<Tuple2<Category, Iterable<PropertyValue>>>() {
 

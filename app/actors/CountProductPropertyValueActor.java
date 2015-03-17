@@ -75,7 +75,7 @@ public class CountProductPropertyValueActor extends CategoryAndPropertyValuesBas
         private final Boolean isAdditional;
 
         public ResponseItem(PropertyDto propertyDto, Boolean isAdditional) {
-            super(propertyDto.getId(), propertyDto.getName(), propertyDto.getDisplayName());
+            super(propertyDto.getName(), propertyDto.getDisplayName());
             getPropertyValues().addAll(propertyDto.getPropertyValues());
             this.isAdditional=isAdditional;
         }

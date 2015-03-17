@@ -8,20 +8,14 @@ import java.util.List;
  */
 public class PropertyDto {
 
-    private final Long id;
     private final String name;
     private final String displayName;
     private final List<PropertyValueDto>propertyValues;
 
-    public PropertyDto(Long id, String name, String displayName) {
-        this.id = id;
+    public PropertyDto(String name, String displayName) {
         this.name = name;
         this.displayName = displayName;
         this.propertyValues=new ArrayList<>();
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getName() {

@@ -23,16 +23,16 @@ public class ProductDao {
 
         final Promise<Product> promise = Futures.promise();
 
-        String query="select * from product where code = $1";
+        String query = "select * from product where code = $1";
 
-        MyConnectionPool.db.query(query,Arrays.asList(code),result->{
-            if(result.size()>0)
+        MyConnectionPool.db.query(query, Arrays.asList(code), result -> {
+            if (result.size() > 0)
                 promise.success(new Product(result.row(0).getLong("id"), result.row(0).getString("code"), result.row(0).getString("displayName"),
                         result.row(0).getBigDecimal("price").doubleValue(), result.row(0).getString("description"),
                         result.row(0).getString("imageUrl"), result.row(0).getLong("category_id")));
             else
                 promise.failure(new Exception("Product with specified code doesn't exist"));
-        },promise::failure);
+        }, promise::failure);
 
         return promise.future();
     }
@@ -86,8 +86,8 @@ public class ProductDao {
 
         final Promise<List<PropertyDto>> promise = Futures.promise();
 
-        final StringBuilder queryBuilder = new StringBuilder("select prop.id as prop_id, prop.name as prop_name, prop.displayname as prop_displayname,")
-                .append(" propval.id as propval_id, propval.name as propval_name, propval.displayname as propval_displayname, count(*) from product as prod")
+        final StringBuilder queryBuilder = new StringBuilder("select prop.name as prop_name, prop.displayname as prop_displayname,")
+                .append(" propval.name as propval_name, propval.displayname as propval_displayname, count(*) from product as prod")
                 .append(" inner join product_property_value as ppv on product_id=prod.id")
                 .append(" inner join property_value as propval on propval.id=ppv.propertyvalues_id")
                 .append(" inner join property as prop on prop.id=propval.property_id")
@@ -114,20 +114,20 @@ public class ProductDao {
             queryBuilder.append(")");
         }
 
-        queryBuilder.append(" group by prop.id, prop.name, prop.displayname, propval.id, propval.name, propval.displayname, ppv.propertyvalues_id order by prop.displayname, propval.displayname");
+        queryBuilder.append(" group by prop.name, prop.displayname, propval.name, propval.displayname, ppv.propertyvalues_id order by prop.displayname, propval.displayname");
 
         MyConnectionPool.db.query(queryBuilder.toString(),
                 queryRes -> {
                     final List<PropertyDto> result = new ArrayList<>();
                     PropertyDto resultItem = null;
                     for (Row row : queryRes) {
-                        if (resultItem == null || !resultItem.getId().equals(row.getLong("prop_id"))) {
-                            resultItem = new PropertyDto(row.getLong("prop_id"), row.getString("prop_name"), row.getString("prop_displayname"));
+                        if (resultItem == null || !resultItem.getName().equals(row.getString("prop_name"))) {
+                            resultItem = new PropertyDto(row.getString("prop_name"), row.getString("prop_displayname"));
                             result.add(resultItem);
                         }
 
-                        resultItem.getPropertyValues().add(new PropertyValueWithCountDto(row.getLong("propval_id"), row.getString("propval_name"),
-                                row.getString("propval_displayname"), row.getLong("prop_id"), row.getLong("count")));
+                        resultItem.getPropertyValues().add(new PropertyValueWithCountDto(row.getString("propval_name"),
+                                row.getString("propval_displayname"), row.getLong("count")));
                     }
 
                     promise.success(result);
@@ -167,7 +167,7 @@ public class ProductDao {
 
         MyConnectionPool.db.query(query, Arrays.asList(product.getId(), product.getCode(), product.getDescription(),
                         product.getDisplayName(), product.getImageUrl(), product.getPrice(), 0, product.getCategoryId()),
-                result -> updatePropertyValues(product.getId(), propertyValueIds, res->promise.success(1L), promise::failure),
+                result -> updatePropertyValues(product.getId(), propertyValueIds, res -> promise.success(1L), promise::failure),
                 promise::failure);
 
         return promise.future();
@@ -191,7 +191,7 @@ public class ProductDao {
             }
         }
 
-        MyConnectionPool.db.query(queryBuilder.toString(),consumer,consumer1);
+        MyConnectionPool.db.query(queryBuilder.toString(), consumer, consumer1);
     }
 
     private static void buildPropertyValuesSubqueries(Map<Long, List<Long>> propertyValueIds, StringBuilder queryBuilder) {

@@ -4,26 +4,20 @@ import actors.CountProductPropertyValueActor;
 import actors.ListProductsByCategoryAndFilterActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import akka.dispatch.Futures;
-import akka.dispatch.OnComplete;
 import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
 import dao.CategoryDao;
 import dao.ProductDao;
-import dao.PropertyDao;
+import dao.PropertyValueDao;
 import dto.ErrorResponseDto;
 import model.Category;
 import model.Product;
 import model.PropertyValue;
-import play.api.*;
 import play.libs.Akka;
-import play.libs.F;
 import play.libs.F.Promise;
-import play.libs.HttpExecution;
 import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Result;
-import scala.concurrent.Future;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +68,7 @@ public class ProductController extends Controller {
         final Promise<Category> categoryPromise = Promise.wrap(CategoryDao.getByName(jsonNode.get("category").asText()));
 
         List<Promise<PropertyValue>> propertyValuePromises = new ArrayList<>();
-        jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyDao.getPropertyValueByName(propVal.asText()))));
+        jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyValueDao.getByName(propVal.asText()))));
 
         final Promise<Result> result = categoryPromise.zip(Promise.sequence(propertyValuePromises)).flatMap(res -> {
 
@@ -92,18 +86,22 @@ public class ProductController extends Controller {
 
         final JsonNode jsonNode = request().body().asJson();
 
+        final Promise<Product> productPromise = Promise.wrap(ProductDao.getByCode(jsonNode.get("code").asText()));
+
         final Promise<Category> categoryPromise = Promise.wrap(CategoryDao.getByName(jsonNode.get("category").asText()));
 
         List<Promise<PropertyValue>> propertyValuePromises = new ArrayList<>();
-        jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyDao.getPropertyValueByName(propVal.asText()))));
+        jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyValueDao.getByName(propVal.asText()))));
 
-        final Promise<Result> result = categoryPromise.zip(Promise.sequence(propertyValuePromises)).flatMap(res -> {
+        final Promise<Result> result = productPromise.zip(categoryPromise.zip(Promise.sequence(propertyValuePromises))).flatMap(res -> {
+            Product product=res._1;
+            product.setDisplayName(jsonNode.get("displayName").asText());
+            product.setPrice(jsonNode.get("price").asDouble());
+            product.setDescription(jsonNode.get("description").asText());
+            product.setImageUrl(jsonNode.get("imageUrl").asText());
+            product.setCategoryId(res._2._1.getId());
 
-            Product product = new Product(jsonNode.get("id").asLong(), jsonNode.get("code").asText(), jsonNode.get("displayName").asText(),
-                    jsonNode.get("price").asDouble(), jsonNode.get("description").asText(), jsonNode.get("imageUrl").asText(),
-                    res._1.getId());
-
-            return Promise.wrap(ProductDao.update(product, res._2.stream().map(PropertyValue::getId).collect(Collectors.toSet())));
+            return Promise.wrap(ProductDao.update(product, res._2._2.stream().map(PropertyValue::getId).collect(Collectors.toSet())));
         }).map(res -> ok(Json.toJson("updated")));
 
         return result.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));

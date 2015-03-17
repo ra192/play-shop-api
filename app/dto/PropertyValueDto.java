@@ -5,20 +5,12 @@ package dto;
  */
 public class PropertyValueDto {
 
-    private Long id;
     private String name;
     private String displayName;
-    private Long propertyId;
 
-    public PropertyValueDto(Long id, String name, String displayName, Long propertyId) {
-        this.id = id;
+    public PropertyValueDto(String name, String displayName) {
         this.name = name;
         this.displayName = displayName;
-        this.propertyId = propertyId;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public String getName() {
@@ -27,9 +19,5 @@ public class PropertyValueDto {
 
     public String getDisplayName() {
         return displayName;
-    }
-
-    public Long getPropertyId() {
-        return propertyId;
     }
 }

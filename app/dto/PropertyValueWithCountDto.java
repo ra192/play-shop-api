@@ -7,8 +7,8 @@ public class PropertyValueWithCountDto extends PropertyValueDto {
 
     private Long count;
 
-    public PropertyValueWithCountDto(Long id, String name, String displayName, Long propertyId,Long count) {
-        super(id, name, displayName, propertyId);
+    public PropertyValueWithCountDto(String name, String displayName,Long count) {
+        super(name, displayName);
         this.count=count;
     }
 
