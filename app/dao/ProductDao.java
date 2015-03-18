@@ -178,12 +178,12 @@ public class ProductDao {
         final StringBuilder queryBuilder = new StringBuilder("delete from product_property_value where product_id = ").append(productId).append(";");
 
         if (!propertyValueIds.isEmpty()) {
-            queryBuilder.append("INSERT INTO product_property_value(product_id, propertyvalues_id)");
+            queryBuilder.append("INSERT INTO product_property_value(product_id, propertyvalues_id) VALUES");
             final Iterator<Long> iterator = propertyValueIds.iterator();
 
             while (iterator.hasNext()) {
                 Long propertyValueId = iterator.next();
-                queryBuilder.append(" VALUES (").append(productId).append(",").append(propertyValueId).append(")");
+                queryBuilder.append(" (").append(productId).append(",").append(propertyValueId).append(")");
                 if (iterator.hasNext())
                     queryBuilder.append(",");
                 else

@@ -92,14 +92,14 @@ public class CategoryDao {
 
     private static void updateProperties(Long id, Set<Long> propertyIds, Consumer<ResultSet> consumer1, Consumer<Throwable> consumer2) {
 
-        final StringBuilder queryBuilder = new StringBuilder("delete from category_property where category_id=").append(id).append(");");
+        final StringBuilder queryBuilder = new StringBuilder("delete from category_property where category_id=").append(id).append(";");
 
         if (!propertyIds.isEmpty()) {
-            queryBuilder.append("INSERT INTO category_property(category_id, properties_id) VALUES (?, ?)");
+            queryBuilder.append("INSERT INTO category_property(category_id, properties_id) VALUES");
             final Iterator<Long> iterator = propertyIds.iterator();
             while (iterator.hasNext()) {
                 final Long propertyId = iterator.next();
-                queryBuilder.append("VALUES (").append(id).append(", ").append(propertyId).append(")");
+                queryBuilder.append(" (").append(id).append(", ").append(propertyId).append(")");
                 if (iterator.hasNext())
                     queryBuilder.append(", ");
                 else
