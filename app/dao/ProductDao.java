@@ -7,6 +7,7 @@ import db.MyConnectionPool;
 import dto.PropertyDto;
 import dto.PropertyValueWithCountDto;
 import model.Product;
+import model.PropertyValue;
 import scala.concurrent.Future;
 import scala.concurrent.Promise;
 
@@ -133,6 +134,20 @@ public class ProductDao {
                     promise.success(result);
                 },
                 promise::failure);
+
+        return promise.future();
+    }
+
+    public static Future<List<PropertyValue>>listPropertyValuesById(Long id) {
+
+        final Promise<List<PropertyValue>> promise = Futures.promise();
+
+        String query="select id, name, displayname, property_id from property_value inner join product_property_value on id=propertyvalues_id where product_id=$1";
+        MyConnectionPool.db.query(query,Arrays.asList(id),queryRes->{
+            List<PropertyValue> result=new ArrayList<>();
+            queryRes.forEach(row->result.add(new PropertyValue(row.getLong("id"),row.getString("name"),row.getString("displayname"),row.getLong("property_id"))));
+            promise.success(result);
+        },promise::failure);
 
         return promise.future();
     }

@@ -3,6 +3,7 @@ package actors;
 import akka.actor.ActorContext;
 import akka.actor.ActorRef;
 import akka.actor.Status;
+import akka.dispatch.Futures;
 import akka.dispatch.Mapper;
 import akka.dispatch.OnComplete;
 import dao.ProductDao;
@@ -10,12 +11,15 @@ import dto.ListResponseWithCountDto;
 import dto.ProductDto;
 import model.Category;
 import model.Product;
+import model.PropertyValue;
 import scala.Tuple2;
 import scala.concurrent.Future;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Created by yakov_000 on 09.02.2015.
@@ -33,18 +37,31 @@ public class ListProductsByCategoryAndFilterActor extends CategoryAndPropertyVal
 
         Message inputParams = (Message) message;
 
-        final Future<ListResponseWithCountDto> resultFuture =
-                ProductDao.listByCategoryIdAndPropertyValues(category.getId(), propertyValueIds, inputParams.getFirst(),
-                        inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc())
-                        .zip(ProductDao.countByCategoryIdAndPropertyValues(category.getId(), propertyValueIds))
-                        .map(new Mapper<Tuple2<List<Product>, Long>, ListResponseWithCountDto>() {
+        final Future<List<Product>> productsFuture = ProductDao.listByCategoryIdAndPropertyValues(category.getId(), propertyValueIds, inputParams.getFirst(),
+                inputParams.getMax(), inputParams.getOrderProperty(), inputParams.getIsAsc());
+
+        final Future<Iterable<ProductDto>> productsDtoFuture = productsFuture.flatMap(new Mapper<List<Product>, Future<Iterable<ProductDto>>>() {
+            @Override
+            public Future<Iterable<ProductDto>> apply(List<Product> products) {
+                return Futures.sequence(products.stream().map(product -> ProductDao.listPropertyValuesById(product.getId())
+                        .map(new Mapper<List<PropertyValue>, ProductDto>() {
                             @Override
-                            public ListResponseWithCountDto apply(Tuple2<List<Product>, Long> parameter) {
-                                return new ListResponseWithCountDto(parameter._1().stream().map(product ->
-                                        new ProductDto(product,category))
-                                        .collect(Collectors.toList()), parameter._2());
+                            public ProductDto apply(List<PropertyValue> propertyValues) {
+                                return new ProductDto(product, category, propertyValues);
                             }
-                        }, context.dispatcher());
+                        }, context.dispatcher())).collect(Collectors.toList()), context.dispatcher());
+            }
+        }, context.dispatcher());
+
+        final Future<ListResponseWithCountDto> resultFuture = productsDtoFuture
+                .zip(ProductDao.countByCategoryIdAndPropertyValues(category.getId(), propertyValueIds))
+                .map(new Mapper<Tuple2<Iterable<ProductDto>, Long>, ListResponseWithCountDto>() {
+                    @Override
+                    public ListResponseWithCountDto apply(Tuple2<Iterable<ProductDto>, Long> res) {
+                        return new ListResponseWithCountDto(StreamSupport.stream(res._1().spliterator(), false).collect(Collectors.toList()), res._2());
+                    }
+                }, context.dispatcher());
+
         resultFuture.onComplete(new OnComplete<ListResponseWithCountDto>() {
 
             @Override
