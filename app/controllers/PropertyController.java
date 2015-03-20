@@ -3,6 +3,7 @@ package controllers;
 import com.fasterxml.jackson.databind.JsonNode;
 import dao.PropertyDao;
 import dao.PropertyValueDao;
+import dto.ErrorResponseDto;
 import model.Property;
 import model.PropertyValue;
 import play.libs.F.Promise;
@@ -34,6 +35,6 @@ public class PropertyController extends Controller {
             return Promise.sequence(propertyValuePromises);
         }).map(res -> ok(Json.toJson("created")));
 
-        return result;
+        return result.recover(error->ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
 }

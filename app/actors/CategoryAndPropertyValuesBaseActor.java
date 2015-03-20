@@ -55,7 +55,7 @@ public abstract class CategoryAndPropertyValuesBaseActor extends AbstractActor {
     protected abstract void onReceive(Object message, Category category, Map<Long, List<Long>> propertyValueIds,
                                       ActorRef self, ActorRef sender, ActorContext context);
 
-    protected Map<Long, List<Long>> groupPropertyValueIds(Iterable<PropertyValue> result) {
+    private Map<Long, List<Long>> groupPropertyValueIds(Iterable<PropertyValue> result) {
 
         Map<Long, List<Long>> resultMap = new HashMap<>();
 
