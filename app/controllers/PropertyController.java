@@ -6,6 +6,7 @@ import dao.PropertyValueDao;
 import dto.ErrorResponseDto;
 import model.Property;
 import model.PropertyValue;
+import play.libs.F;
 import play.libs.F.Promise;
 import play.libs.Json;
 import play.mvc.Controller;
@@ -33,6 +34,18 @@ public class PropertyController extends Controller {
                 propertyValuePromises.add(Promise.wrap(PropertyValueDao.create(propertyValue)));
             });
             return Promise.sequence(propertyValuePromises);
+        }).map(res -> ok(Json.toJson("created")));
+
+        return result.recover(error->ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
+    }
+
+    public static Promise<Result>update() {
+
+        final JsonNode jsonNode = request().body().asJson();
+
+        final Promise<Result> result = Promise.wrap(PropertyDao.getByName(jsonNode.get("name").asText())).flatMap(property -> {
+            property.setDisplayName(jsonNode.get("displayName").asText());
+            return Promise.wrap(PropertyDao.update(property));
         }).map(res -> ok(Json.toJson("created")));
 
         return result.recover(error->ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
