@@ -14,7 +14,8 @@ GET            /categories/:categoryName/products/properties        controllers.
 POST           /products                                            controllers.ProductController.create()
 PUT            /products                                            controllers.ProductController.update()
 
-POST           /property/create.json                                controllers.PropertyController.create()
+POST           /properties                                          controllers.PropertyController.create()
+PUT            /properties                                          controllers.PropertyController.update()
 
 # Add headers to options requests for CORS
 OPTIONS        /*path                                               controllers.OptionsRequestController.options(path:String)
