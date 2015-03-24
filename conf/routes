@@ -9,7 +9,7 @@ GET            /categories                                          controllers.
 POST           /categories                                          controllers.CategoryController.create()
 PUT            /categories                                          controllers.CategoryController.update()
 
-GET            /categories/:categoryName/products                   controllers.ProductController.listByCategoryAndFilter(categoryName,propertyValues:java.util.List[String], orderProperty ?="displayName", isAsk:Boolean ?= true, first:Int?=0, max:Int ?=100)
+GET            /categories/:categoryName/products                   controllers.ProductController.listByCategoryAndFilter(categoryName,propertyValues:java.util.List[String], orderProperty ?="displayName", isAsk:Boolean ?= true, first:Int?=0, max:Int ?=10)
 GET            /categories/:categoryName/products/properties        controllers.ProductController.countPropertiesByCategoryAndFilter(categoryName,propertyValues:java.util.List[String])
 POST           /products                                            controllers.ProductController.create()
 PUT            /products                                            controllers.ProductController.update()
