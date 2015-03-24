@@ -28,33 +28,20 @@ import java.util.stream.Collectors;
  */
 public class ProductController extends Controller {
 
-    public static Promise<Result> listByCategoryAndFilter(String categoryName) {
-
-        final JsonNode bodyAsJson = request().body().asJson();
+    public static Promise<Result> listByCategoryAndFilter(String categoryName, List<String> propertyValues, String orderProperty,
+                                                          Boolean isAsk, Integer first, Integer max) {
 
         final ActorRef actorRef = Akka.system().actorOf(Props.create(ListProductsByCategoryAndFilterActor.class));
 
-        final ArrayList<String> propertyValues = new ArrayList<>();
-        bodyAsJson.get("propertyValues").forEach(itm -> propertyValues.add(itm.asText()));
-
-        final Integer first = (bodyAsJson.get("first") != null) ? bodyAsJson.get("first").asInt() : 0;
-        final Integer max = (bodyAsJson.get("max") != null) ? bodyAsJson.get("max").asInt() : 100;
-        final String orderProperty = (bodyAsJson.get("orderProperty") != null) ? bodyAsJson.get("max").asText() : "displayName";
-        final Boolean isAsk = (bodyAsJson.get("isAsk") != null) ? bodyAsJson.get("max").asBoolean() : true;
-
         final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
                 new ListProductsByCategoryAndFilterActor.Message(categoryName, propertyValues, first, max, orderProperty, isAsk), 5000)).map(res -> ok(Json.toJson(res)));
+
         return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
 
-    public static Promise<Result> countPropertiesByCategoryAndFilter(String categoryName) {
-
-        final JsonNode bodyAsJson = request().body().asJson();
+    public static Promise<Result> countPropertiesByCategoryAndFilter(String categoryName, List<String> propertyValues) {
 
         final ActorRef actorRef = Akka.system().actorOf(Props.create(CountProductPropertyValueActor.class));
-
-        final ArrayList<String> propertyValues = new ArrayList<>();
-        bodyAsJson.get("propertyValues").forEach(itm -> propertyValues.add(itm.asText()));
 
         final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
                 new CountProductPropertyValueActor.Message(categoryName, propertyValues), 5000)).map(res -> ok(Json.toJson(res)));
@@ -82,7 +69,7 @@ public class ProductController extends Controller {
         return result.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
 
-    public static Promise<Result>update() {
+    public static Promise<Result> update() {
 
         final JsonNode jsonNode = request().body().asJson();
 
@@ -94,7 +81,7 @@ public class ProductController extends Controller {
         jsonNode.get("propertyValues").forEach(propVal -> propertyValuePromises.add(Promise.wrap(PropertyValueDao.getByName(propVal.asText()))));
 
         final Promise<Result> result = productPromise.zip(categoryPromise.zip(Promise.sequence(propertyValuePromises))).flatMap(res -> {
-            Product product=res._1;
+            Product product = res._1;
             product.setDisplayName(jsonNode.get("displayName").asText());
             product.setPrice(jsonNode.get("price").asDouble());
             product.setDescription(jsonNode.get("description").asText());

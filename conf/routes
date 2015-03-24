@@ -3,21 +3,21 @@
 # ~~~~
 
 # Home page
-GET            /                                             controllers.Application.index()
+GET            /                                                    controllers.Application.index()
 
-GET            /categories.json                              controllers.CategoryController.listRoots()
-POST           /category/create.json                         controllers.CategoryController.create()
-POST           /category/update.json                         controllers.CategoryController.update()
+GET            /categories                                          controllers.CategoryController.listRoots()
+POST           /categories                                          controllers.CategoryController.create()
+PUT            /categories                                          controllers.CategoryController.update()
 
-POST           /products/:categoryName.json                  controllers.ProductController.listByCategoryAndFilter(categoryName:String)
-POST           /productsProperties/:categoryName.json        controllers.ProductController.countPropertiesByCategoryAndFilter(categoryName:String)
-POST           /product/create.json                          controllers.ProductController.create()
-POST           /product/update.json                          controllers.ProductController.update()
+GET            /categories/:categoryName/products                   controllers.ProductController.listByCategoryAndFilter(categoryName,propertyValues:java.util.List[String], orderProperty ?="displayName", isAsk:Boolean ?= true, first:Int?=0, max:Int ?=100)
+GET            /categories/:categoryName/products/properties        controllers.ProductController.countPropertiesByCategoryAndFilter(categoryName,propertyValues:java.util.List[String])
+POST           /products                                            controllers.ProductController.create()
+PUT            /products                                            controllers.ProductController.update()
 
-POST           /property/create.json                         controllers.PropertyController.create()
+POST           /property/create.json                                controllers.PropertyController.create()
 
 # Add headers to options requests for CORS
-OPTIONS        /*path                                        controllers.OptionsRequestController.options(path:String)
+OPTIONS        /*path                                               controllers.OptionsRequestController.options(path:String)
 
 # Map static resources from the /public folder to the /assets URL path
-GET            /assets/*file                                 controllers.Assets.at(path="/public", file)
+GET            /assets/*file                                        controllers.Assets.at(path="/public", file)
