@@ -11,6 +11,7 @@ import play.libs.F.Promise;
 import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Result;
+import play.mvc.With;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 /**
  * Created by yakov_000 on 17.03.2015.
  */
+@With(CorsAction.class)
 public class PropertyController extends Controller {
 
     public static Promise<Result> create() {
