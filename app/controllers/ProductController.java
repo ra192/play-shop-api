@@ -1,23 +1,15 @@
 package controllers;
 
-import actors.ListProductsByCategoryAndFilterActor;
-import akka.actor.ActorRef;
-import akka.actor.Props;
-import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
 import dao.CategoryDao;
 import dao.ProductDao;
 import dao.PropertyDao;
 import dao.PropertyValueDao;
-import dto.ErrorResponseDto;
-import dto.ListResponseDto;
-import dto.PropertyDto;
-import dto.PropertyValueDto;
+import dto.*;
 import model.Category;
 import model.Product;
 import model.Property;
 import model.PropertyValue;
-import play.libs.Akka;
 import play.libs.F.Promise;
 import play.libs.Json;
 import play.mvc.Controller;
@@ -36,10 +28,32 @@ public class ProductController extends Controller {
     public static Promise<Result> listByCategoryAndFilter(String categoryName, List<String> propertyValues, String orderProperty,
                                                           Boolean isAsk, Integer first, Integer max) {
 
-        final ActorRef actorRef = Akka.system().actorOf(Props.create(ListProductsByCategoryAndFilterActor.class));
+        final Promise<Category> categoryPromise = Promise.wrap(CategoryDao.getByName(categoryName));
 
-        final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
-                new ListProductsByCategoryAndFilterActor.Message(categoryName, propertyValues, first, max, orderProperty, isAsk), 5000)).map(res -> ok(Json.toJson(res)));
+        final Promise<List<PropertyValue>> propertyValuesPromise = Promise.sequence(propertyValues.stream()
+                .map(PropertyValueDao::getByName).map(Promise::wrap).collect(Collectors.toList()));
+
+        final Promise<Result> promiseResult = categoryPromise.zip(propertyValuesPromise)
+                .flatMap(catAndPropVals -> {
+                    final Map<Long, List<PropertyValue>> propertyValuesMap = groupPropertyValues(catAndPropVals._2);
+
+                    final Map<Long, List<Long>> propertyValueIds = propertyValuesMap.keySet().stream().collect(
+                            Collectors.toMap(key -> key, key -> propertyValuesMap.get(key).stream()
+                                    .map(PropertyValue::getId).collect(Collectors.toList())));
+
+                    final Promise<List<Product>> productsPromise = Promise.wrap(ProductDao.listByCategoryIdAndPropertyValues(
+                            catAndPropVals._1.getId(), propertyValueIds, first, max, orderProperty, isAsk));
+
+                    final Promise<List<ProductDto>> productsDtoPromise = productsPromise.flatMap(products ->
+                            Promise.sequence(products.stream().map(product -> Promise.wrap(
+                                    ProductDao.listPropertyValuesById(product.getId())).map(propVals ->
+                                    new ProductDto(product, catAndPropVals._1, propVals))).collect(Collectors.toList())));
+
+                    final Promise<Long> countPromise = Promise.wrap(ProductDao.countByCategoryIdAndPropertyValues(
+                            catAndPropVals._1.getId(), propertyValueIds));
+
+                    return productsDtoPromise.zip(countPromise).map(res->new ListResponseWithCountDto(res._1,res._2));
+                }).map(res -> ok(Json.toJson(res)));
 
         return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
@@ -146,19 +160,19 @@ public class ProductController extends Controller {
             List<PropertyDto> properrtiesCount, List<List<PropertyDto>> additionalProperrtiesCount, List<Property> properties,
             Map<Long, List<PropertyValue>> propertyValuesMap) {
 
-        final Set<CountPropertiesResponseItem> propertiesSet = new TreeSet<>((o1,o2)->o1.getDisplayName().compareTo(o2.getDisplayName()));
-        properrtiesCount.forEach(itm->propertiesSet.add(new CountPropertiesResponseItem(itm,false)));
-        additionalProperrtiesCount.forEach(list->list.forEach(itm->propertiesSet.add(new CountPropertiesResponseItem(itm,true))));
+        final Set<CountPropertiesResponseItem> propertiesSet = new TreeSet<>((o1, o2) -> o1.getDisplayName().compareTo(o2.getDisplayName()));
+        properrtiesCount.forEach(itm -> propertiesSet.add(new CountPropertiesResponseItem(itm, false)));
+        additionalProperrtiesCount.forEach(list -> list.forEach(itm -> propertiesSet.add(new CountPropertiesResponseItem(itm, true))));
 
-        final Set<PropertyDto>selectedPropertiesSet = new TreeSet<>((o1,o2)->o1.getDisplayName().compareTo(o2.getDisplayName()));
-        properties.forEach(itm->{
+        final Set<PropertyDto> selectedPropertiesSet = new TreeSet<>((o1, o2) -> o1.getDisplayName().compareTo(o2.getDisplayName()));
+        properties.forEach(itm -> {
             final PropertyDto propertyDto = new PropertyDto(itm.getName(), itm.getDisplayName());
-            propertyValuesMap.get(itm.getId()).forEach(propertyValue->propertyDto.getPropertyValues()
+            propertyValuesMap.get(itm.getId()).forEach(propertyValue -> propertyDto.getPropertyValues()
                     .add(new PropertyValueDto(propertyValue.getName(), propertyValue.getDisplayName())));
             selectedPropertiesSet.add(propertyDto);
         });
 
-        return new CountPropertiesResponse(new ArrayList<>(propertiesSet),new ArrayList<>(selectedPropertiesSet));
+        return new CountPropertiesResponse(new ArrayList<>(propertiesSet), new ArrayList<>(selectedPropertiesSet));
     }
 
     public static class CountPropertiesResponse extends ListResponseDto<CountPropertiesResponseItem> {
@@ -175,8 +189,8 @@ public class ProductController extends Controller {
 
         public final Boolean isAdditional;
 
-        public CountPropertiesResponseItem(PropertyDto propertyDto,Boolean isAdditional) {
-            super(propertyDto.getName(),propertyDto.getDisplayName());
+        public CountPropertiesResponseItem(PropertyDto propertyDto, Boolean isAdditional) {
+            super(propertyDto.getName(), propertyDto.getDisplayName());
             getPropertyValues().addAll(propertyDto.getPropertyValues());
             this.isAdditional = isAdditional;
         }
