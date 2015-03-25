@@ -1,6 +1,5 @@
 package controllers;
 
-import actors.CountProductPropertyValueActor;
 import actors.ListProductsByCategoryAndFilterActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -8,10 +7,15 @@ import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
 import dao.CategoryDao;
 import dao.ProductDao;
+import dao.PropertyDao;
 import dao.PropertyValueDao;
 import dto.ErrorResponseDto;
+import dto.ListResponseDto;
+import dto.PropertyDto;
+import dto.PropertyValueDto;
 import model.Category;
 import model.Product;
+import model.Property;
 import model.PropertyValue;
 import play.libs.Akka;
 import play.libs.F.Promise;
@@ -20,8 +24,7 @@ import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.With;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -43,12 +46,37 @@ public class ProductController extends Controller {
 
     public static Promise<Result> countPropertiesByCategoryAndFilter(String categoryName, List<String> propertyValues) {
 
-        final ActorRef actorRef = Akka.system().actorOf(Props.create(CountProductPropertyValueActor.class));
+        final Promise<Category> categoryPromise = Promise.wrap(CategoryDao.getByName(categoryName));
 
-        final Promise<Result> promiseResult = Promise.wrap(Patterns.ask(actorRef,
-                new CountProductPropertyValueActor.Message(categoryName, propertyValues), 5000)).map(res -> ok(Json.toJson(res)));
+        final Promise<List<PropertyValue>> propertyValuesPromise = Promise.sequence(propertyValues.stream()
+                .map(PropertyValueDao::getByName).map(Promise::wrap).collect(Collectors.toList()));
+
+        final Promise<Result> promiseResult = categoryPromise.zip(propertyValuesPromise)
+                .flatMap(catAndPropVals -> {
+                    final Map<Long, List<PropertyValue>> propertyValuesMap = groupPropertyValues(catAndPropVals._2);
+
+                    final Map<Long, List<Long>> propertyValueIds = propertyValuesMap.keySet().stream().collect(
+                            Collectors.toMap(key -> key, key -> propertyValuesMap.get(key).stream()
+                                    .map(PropertyValue::getId).collect(Collectors.toList())));
+
+                    final Promise<List<PropertyDto>> countPromise = Promise.wrap(ProductDao
+                            .countPropertyValuesByCategoryIdAndFilter(catAndPropVals._1.getId(), null, propertyValueIds));
+
+                    final Promise<List<List<PropertyDto>>> additionalCountsPromise = Promise.sequence(
+                            propertyValueIds.keySet().stream().map(propertyId -> Promise.wrap(ProductDao
+                                    .countPropertyValuesByCategoryIdAndFilter(catAndPropVals._1.getId(), propertyId, propertyValueIds)))
+                                    .collect(Collectors.toList()));
+
+                    final Promise<List<Property>> propertiesPromise = Promise.sequence(propertyValueIds.keySet().stream()
+                            .map(propertyId -> Promise.wrap(PropertyDao.get(propertyId))).collect(Collectors.toList()));
+
+                    return countPromise.zip(additionalCountsPromise).zip(propertiesPromise)
+                            .map(res -> createCountPropertiesResponse(res._1._1, res._1._2, res._2, propertyValuesMap));
+                }).map(res -> ok(Json.toJson(res)));
+
         return promiseResult.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
     }
+
 
     public static Promise<Result> create() {
 
@@ -94,5 +122,63 @@ public class ProductController extends Controller {
         }).map(res -> ok(Json.toJson("updated")));
 
         return result.recover(error -> ok(Json.toJson(new ErrorResponseDto(error.getMessage()))));
+    }
+
+    private static Map<Long, List<PropertyValue>> groupPropertyValues(List<PropertyValue> propertyValues) {
+
+        final Map<Long, List<PropertyValue>> resultMap = new HashMap<>();
+
+        propertyValues.forEach(propertyValue -> {
+            final List<PropertyValue> resultItem;
+            if (resultMap.containsKey(propertyValue.getPropertyId()))
+                resultItem = resultMap.get(propertyValue.getPropertyId());
+            else {
+                resultItem = new ArrayList<>();
+                resultMap.put(propertyValue.getPropertyId(), resultItem);
+            }
+            resultItem.add(propertyValue);
+        });
+
+        return resultMap;
+    }
+
+    private static CountPropertiesResponse createCountPropertiesResponse(
+            List<PropertyDto> properrtiesCount, List<List<PropertyDto>> additionalProperrtiesCount, List<Property> properties,
+            Map<Long, List<PropertyValue>> propertyValuesMap) {
+
+        final Set<CountPropertiesResponseItem> propertiesSet = new TreeSet<>((o1,o2)->o1.getDisplayName().compareTo(o2.getDisplayName()));
+        properrtiesCount.forEach(itm->propertiesSet.add(new CountPropertiesResponseItem(itm,false)));
+        additionalProperrtiesCount.forEach(list->list.forEach(itm->propertiesSet.add(new CountPropertiesResponseItem(itm,true))));
+
+        final Set<PropertyDto>selectedPropertiesSet = new TreeSet<>((o1,o2)->o1.getDisplayName().compareTo(o2.getDisplayName()));
+        properties.forEach(itm->{
+            final PropertyDto propertyDto = new PropertyDto(itm.getName(), itm.getDisplayName());
+            propertyValuesMap.get(itm.getId()).forEach(propertyValue->propertyDto.getPropertyValues()
+                    .add(new PropertyValueDto(propertyValue.getName(), propertyValue.getDisplayName())));
+            selectedPropertiesSet.add(propertyDto);
+        });
+
+        return new CountPropertiesResponse(new ArrayList<>(propertiesSet),new ArrayList<>(selectedPropertiesSet));
+    }
+
+    public static class CountPropertiesResponse extends ListResponseDto<CountPropertiesResponseItem> {
+
+        public final List<PropertyDto> selectedProperties;
+
+        public CountPropertiesResponse(List<CountPropertiesResponseItem> data, List<PropertyDto> selectedProperties) {
+            super(data);
+            this.selectedProperties = selectedProperties;
+        }
+    }
+
+    public static class CountPropertiesResponseItem extends PropertyDto {
+
+        public final Boolean isAdditional;
+
+        public CountPropertiesResponseItem(PropertyDto propertyDto,Boolean isAdditional) {
+            super(propertyDto.getName(),propertyDto.getDisplayName());
+            getPropertyValues().addAll(propertyDto.getPropertyValues());
+            this.isAdditional = isAdditional;
+        }
     }
 }
