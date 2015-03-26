@@ -1,9 +1,5 @@
 package controllers;
 
-import actors.ListCategoriesByParentActor;
-import akka.actor.ActorRef;
-import akka.actor.Props;
-import akka.pattern.Patterns;
 import com.fasterxml.jackson.databind.JsonNode;
 import dao.CategoryDao;
 import dao.PropertyDao;
@@ -12,14 +8,11 @@ import dto.ErrorResponseDto;
 import dto.ListResponseDto;
 import model.Category;
 import model.Property;
-import play.libs.Akka;
-import play.libs.F;
 import play.libs.F.Promise;
 import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.With;
-import scala.concurrent.Future;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,12 +27,18 @@ public class CategoryController extends Controller {
 
     public static Promise<Result> listRoots() {
 
-        final ActorRef actorRef = Akka.system().actorOf(Props.create(ListCategoriesByParentActor.class));
+        return listByParent(0L).map(res -> ok(Json.toJson(new ListResponseDto<>(res))));
+    }
 
-        return Promise.wrap(Patterns.ask(actorRef, new Long(0), 5000)).map(res -> {
-            List<CategoryDto> categories = (List<CategoryDto>) res;
-            return ok(Json.toJson(new ListResponseDto<>(categories)));
-        });
+    private static Promise<List<CategoryDto>> listByParent(Long parentId) {
+
+        final Promise<List<Category>> categoriesPromise = Promise.wrap(CategoryDao.listByParentId(parentId));
+
+        return categoriesPromise.flatMap(categories -> Promise.sequence(categories.stream().map(category -> listByParent(category.getId()).map(childCategoriesDto -> {
+            final CategoryDto categoryDto = new CategoryDto(category);
+            categoryDto.getChildren().addAll(childCategoriesDto);
+            return categoryDto;
+        })).collect(Collectors.toList())));
     }
 
     public static Promise<Result> create() {
@@ -78,7 +77,7 @@ public class CategoryController extends Controller {
         jsonNode.get("properties").forEach(propVal -> propertyPromises.add(Promise.wrap(PropertyDao.getByName(propVal.asText()))));
 
         final Promise<Result> result = categoryPromise.zip(parentPromise.zip(Promise.sequence(propertyPromises))).flatMap(res -> {
-            final Long parentId = (res._2._1 != null)?res._2._1.getId():null;
+            final Long parentId = (res._2._1 != null) ? res._2._1.getId() : null;
             final Category category = res._1;
             category.setDisplayName(jsonNode.get("displayName").asText());
             category.setParentId(parentId);
